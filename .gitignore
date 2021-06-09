@@ -1,0 +1,8 @@
+
+# python
+__pycache__
+venv
+env
+
+# apple
+.DS_Store
