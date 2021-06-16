@@ -6,39 +6,19 @@ import requests
 import json
 import re
 
+from src.utils.logger import BaseModule
 
-class SEC13FWebScraper:
 
-    def __init__(self,
-                 sec_tickers_mapping_url='https://www.sec.gov/files/company_tickers.json',
-                 sec_tickers_mapping_path='meta/sec/tickers.json'):
+class SEC13FWebScraper(BaseModule):
 
-        try:
+    def __init__(self, mapping,
+                 filing_links_url='https://sec.report/Form/',
+                 filing_url='https://sec.report/Document/'):
 
-            # download SEC tickers mapping
-            response = requests.get(sec_tickers_mapping_url)
-            tickers_data = response.json()
-            assert(len(tickers_data) > 0)
-            print('Downloaded SEC tickers mapping.', flush=True)
-
-        except:
-
-            # load local SEC tickers mapping
-            f = open(sec_tickers_mapping_path, 'r')
-            tickers_data = json.load(f)
-            f.close()
-            print('Loaded SEC tickers mapping locally.', flush=True) 
-            
-        # company:
-        #   - name
-        #   - address
-        #   - telephone number
-        #   - state of incorporation
-        #   - CIK (central index key) number
-        #   - SIC (standard industrial classification) code
-
-        self.filing_links_url = 'https://sec.report/Form/'
-        self.filing_url = 'https://sec.report/Document/'
+        super().__init__(self.__class__.__name__)
+        self.mapping = mapping
+        self.filing_links_url = filing_links_url
+        self.filing_url = filing_url
 
     def fetch_filing_ids(self, type='13F-HR'):
 

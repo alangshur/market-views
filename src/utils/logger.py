@@ -1,10 +1,15 @@
 import logging
 import sys
 
+from src.utils.base import BaseModule
 
-class LoggingModule:
+
+class LoggingModule(BaseModule):
 
     def __init__(self, name):
+        super().__init__(self.__class__.__name__)
+
+        # initialize python logger
         self.logger = logging.getLogger(name)
         self.logger.setLevel(logging.DEBUG)
 
@@ -16,3 +21,11 @@ class LoggingModule:
 
     def get_logger(self):
         return self.logger
+
+
+class BaseModuleWithLogging(BaseModule):
+
+    def __init__(self, name):
+        super().__init__(name)
+        self.logger = LoggingModule(name).get_logger()
+        if self.verbose: self.logger.info('Initializing module.')

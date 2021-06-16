@@ -1,18 +1,11 @@
 from abc import ABC
-from src.utils.logger import LoggingModule
 
 
-class UtilityModule(ABC):
+class BaseModule(ABC):
 
-    def __init__(self, name):
+    def __init__(self, name, verbose=True):
         self.name = name
+        self.verbose = verbose
 
     def get_name(self):
         return self.name
-
-
-class LoggingUtilityModule(UtilityModule):
-
-    def __init__(self, name):
-        super().__init__(name)
-        self.logger = LoggingModule(name)
