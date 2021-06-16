@@ -2,16 +2,33 @@ from requests_html import HTMLSession
 import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup
 import pandas as pd
+import requests
+import json
 import re
 
 
 class SEC13FWebScraper:
 
-    def __init__(self):
-        
-        # try to download tickers data from https://www.sec.gov/files/company_tickers.json
-        # otherwise pull local file
+    def __init__(self,
+                 sec_tickers_mapping_url='https://www.sec.gov/files/company_tickers.json',
+                 sec_tickers_mapping_path='meta/sec/tickers.json'):
 
+        try:
+
+            # download SEC tickers mapping
+            response = requests.get(sec_tickers_mapping_url)
+            tickers_data = response.json()
+            assert(len(tickers_data) > 0)
+            print('Downloaded SEC tickers mapping.', flush=True)
+
+        except:
+
+            # load local SEC tickers mapping
+            f = open(sec_tickers_mapping_path, 'r')
+            tickers_data = json.load(f)
+            f.close()
+            print('Loaded SEC tickers mapping locally.', flush=True) 
+            
         # company:
         #   - name
         #   - address
