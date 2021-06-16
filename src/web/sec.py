@@ -1,9 +1,8 @@
+from typing import Tuple, Optional, Union
 from requests_html import HTMLSession
 import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup
-import pandas as pd
-import requests
-import json
+from datetime import datetime
 import re
 
 from src.utils.logger import BaseModule
@@ -11,52 +10,78 @@ from src.utils.logger import BaseModule
 
 class SEC13FWebScraper(BaseModule):
 
-    def __init__(self, mapping,
-                 filing_links_url='https://sec.report/Form/',
-                 filing_url='https://sec.report/Document/'):
+    def __init__(self, mapping_module,
+                 filing_links_url: str='https://sec.report/loadmore.php',
+                 filing_url: str='https://sec.report/Document/'):
 
         super().__init__(self.__class__.__name__)
-        self.mapping = mapping
+        self.mapping_module = mapping_module
         self.filing_links_url = filing_links_url
         self.filing_url = filing_url
 
-    def fetch_filing_ids(self, type='13F-HR'):
+    def fetch_filing_ids(self, since: Union[datetime, str], 
+                         form_number: str='13F-HR') -> Optional[Tuple[list, str]]:
 
-        # load and render webpage
-        session = HTMLSession()
-        r = session.get(self.filing_links_url + type)
-        r.html.render()
-        session.close()
+        try:
 
-        # parse string into html
-        content = r.content.decode('utf-8')
-        content_html = BeautifulSoup(content)
+            # get query dt
+            if isinstance(since, datetime): dt = since.strftime('%Y-%m-%d %H:%M:%S')
+            elif isinstance(since, str): dt = since
+            else: raise Exception('invalid type for \'since\'')
 
-        # extract filing ids
-        filing_table = content_html.find('table')
-        filing_links = [link.get('href') for link in filing_table.find_all('a')]
-        filing_ids = [re.search('\d{10}-\d{2}-\d{6}', link).group(0) for link in filing_links]
-        return filing_ids
+            # load and render webpage
+            session = HTMLSession()
+            r = session.get(self.filing_links_url, params={
+                'form_number': form_number,
+                'dt': dt
+            })
+            r.raise_for_status()
+            r.html.render()
+            session.close()
 
-    def fetch_filing_data_links(self, filing_id):
+            # parse string into html
+            content = r.content.decode('utf-8')
+            content_html = BeautifulSoup(content, features='lxml')
 
-        # load and render webpage
-        session = HTMLSession()
-        r = session.get(self.filing_url + filing_id)
-        r.html.render()
-        session.close()
+            # extract filing ids
+            filing_links = [link.get('href') for link in content_html.find_all('a')]
+            filing_ids = [re.search('\d{10}-\d{2}-\d{6}', link).group(0) for link in filing_links]
+            filing_ids = list(set(filing_ids))
 
-        # parse string into html
-        content = r.content.decode('utf-8')
-        content_html = BeautifulSoup(content)
+            # extract next query dt
+            next_query_dt = content_html.find('div', {'id': 'dt'})
+            next_query_dt = next_query_dt.text
 
-        # extract filing ids
-        filing_links = [link.get('href') for link in content_html.find_all('a')]
-        filing_links = [link for link in filing_links if link.endswith('.xml')]
-        primary_link, holdings_link = filing_links[0], filing_links[1]
-        return primary_link, holdings_link
+            return filing_ids, next_query_dt
 
-    def fetch_filing_holdings(self, holdings_link):
+        except Exception as e:
+            self.logger.error('Exception in fetch_filing_ids: {}.'.format(e))
+            return None
+
+    def fetch_filing_data(self, filing_id: str) -> Optional[Tuple[dict, dict]]:
+        try:
+
+            # load and render webpage
+            session = HTMLSession()
+            r = session.get(self.filing_url + filing_id + '/' + filing_id + '.txt')
+            r.html.render()
+            session.close()
+
+            # parse string into html
+            content = r.content.decode('utf-8')
+            content_html = BeautifulSoup(content, features='lxml')
+
+            # extract filing ids
+            xml_filing_data = content_html.findAll('xml')
+            if len(xml_filing_data) != 2: raise Exception('unexpected number of xml documents')
+    
+            # TODO: parse both xml tables
+
+        except Exception as e:
+            self.logger.error('Exception in fetch_filing_data_links: {}.'.format(e))
+            return None
+
+    def fetch_filing_holdings(self, holdings_link: str) -> Optional[list]:
 
         # load and render webpage
         session = HTMLSession()

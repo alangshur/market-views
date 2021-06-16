@@ -8,8 +8,8 @@ from src.utils.logger import BaseModuleWithLogging
 class MappingModule(BaseModuleWithLogging):
 
     def __init__(self,
-                 sec_tickers_mapping_url='https://www.sec.gov/files/company_tickers.json',
-                 sec_tickers_mapping_path='local/sec/tickers.json'):
+                 sec_tickers_mapping_url: str='https://www.sec.gov/files/company_tickers.json',
+                 sec_tickers_mapping_path: str='local/sec/tickers.json'):
 
         super().__init__(self.__class__.__name__)
         self.sec_tickers_mapping_url = sec_tickers_mapping_url
@@ -19,11 +19,11 @@ class MappingModule(BaseModuleWithLogging):
         self.mappings = {}
         self._load_sec_tickers_mapping()
 
-    def get_mapping(self, mapping_key):
+    def get_mapping(self, mapping_key: str) -> dict:
         if mapping_key in self.mappings: return self.mappings[mapping_key]
         else: return None
 
-    def _load_sec_tickers_mapping(self):
+    def _load_sec_tickers_mapping(self) -> None:
         try:
 
             # download SEC tickers mapping
@@ -35,7 +35,7 @@ class MappingModule(BaseModuleWithLogging):
             self.logger.info('Downloaded SEC tickers mapping.')
 
         except Exception as e:
-            self.logger.error('Error loading SEC tickers mapping: {}.'.format(e))
+            self.logger.error('Exception in _load_sec_tickers_mapping: {}.'.format(e))
 
             # load local SEC tickers mapping
             f = open(self.sec_tickers_mapping_path, 'r')
