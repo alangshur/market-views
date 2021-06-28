@@ -28,4 +28,4 @@ class BaseModuleWithLogging(BaseModule):
     def __init__(self, name: str):
         super().__init__(name)
         self.logger = LoggingModule(name).get_logger()
-        if self.verbose: self.logger.info('Initializing module.')
+        self.logger.info('Initializing module.')
