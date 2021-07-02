@@ -2,28 +2,22 @@ from abc import abstractmethod
 import json
 import os
 
+from src.aws.s3 import AWSS3Connector
 from src.utils.logger import BaseModuleWithLogging
 
 
 class BaseManagerModule(BaseModuleWithLogging):
 
-    def __init__(self, name: str, manifest_file: str):
+    def __init__(self, name: str, aws_s3_connector: AWSS3Connector):
         super().__init__(name)
-
-        # extract manifest file
-        self.manifest_file = manifest_file
-        if os.path.exists(manifest_file): 
-            f = open(manifest_file, 'r')
-            self.manifest = json.load(f)
-            f.close()
-        else:
-            self.manifest = None
+        self.aws_s3_connector = aws_s3_connector
 
     @abstractmethod
     def update(self) -> None:
         raise NotImplemented
 
-    def _save_manifest(self, manifest) -> None:
-        f = open(self.manifest_file, 'w+')
-        json.dump(manifest, f)
-        f.close()
+    def _load_manifest(self) -> dict:
+        return self.aws_s3_connector.get_raw_manifest(self.get_name())
+
+    def _save_manifest(self, manifest: dict) -> None:
+        self.aws_s3_connector.save_raw_manifest(self.get_name(), manifest)

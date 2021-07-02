@@ -2,18 +2,18 @@ from dateutil.relativedelta import relativedelta
 from datetime import datetime
 import time
 
+from src.aws.s3 import AWSS3Connector
 from src.raw.scrapers.sec import SEC13FScraper
 from src.raw.managers.base import BaseManagerModule
 
 
 class SEC13FManager(BaseManagerModule):
     
-    def __init__(self, sec_13f_scraper: SEC13FScraper,
-                 manifest_file: str='local/manifests/sec.manifest.json',
+    def __init__(self, sec_13f_scraper: SEC13FScraper, aws_s3_connector: AWSS3Connector,
                  default_history_size: relativedelta=relativedelta(days=1),
                  default_delay_time: int=0):
 
-        super().__init__(self.__class__.__name__, manifest_file)
+        super().__init__(self.__class__.__name__, aws_s3_connector)
 
         self.sec_13f_scraper = sec_13f_scraper 
         self.default_history_size = default_history_size
@@ -21,36 +21,40 @@ class SEC13FManager(BaseManagerModule):
 
     def update(self) -> None:
 
-        # pull manifest
-        if self.manifest is None:
+        # get manifest
+        manifest = self._load_manifest()
+        if manifest is None:
             history_size = self.default_history_size
             delay_time = self.default_delay_time
         else:
-            history_size = self.manifest['default_history_size']
-            delay_time = self.manifest['default_delay_time']
+            history_size = manifest['default_history_size']
+            delay_time = manifest['default_delay_time']
 
         # get start/end targets
         fetch_from_dt = datetime.now() + relativedelta(days=1)
         fetch_until_dt = fetch_from_dt - history_size
         
         # extract filing IDs
-        print('Loading filing IDs.')
+        start_epoch_time = time.time()
+        self.logger.info('Loading filing IDs.')
         get_result = self._get_filing_ids(fetch_from_dt, fetch_until_dt, delay_time)
         if get_result is None: return None
         filing_ids, query_dts = get_result
         start_query_dt = query_dts[0]
 
         # extract filing data
-        print('Loading filing data.')
+        self.logger.info('Loading filing data.')
         get_result = self._get_filing_data(filing_ids, delay_time)
         if get_result is None: return None
         filing_data = get_result
+        end_epoch_time = time.time()
 
         # save manifest
         self._save_manifest({
             'default_history_size': history_size,
             'default_delay_time': delay_time,
-            'first_dt': str(start_query_dt.date())
+            'first_dt': str(start_query_dt.date()),
+            'last_run_time_secs': float(end_epoch_time - start_epoch_time)
         })
 
         return filing_data
