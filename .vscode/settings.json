@@ -1,4 +1,4 @@
 {
-    "python.pythonPath": "/Users/alexlangshur/Documents/Projects.nosync/market-views/env/bin/python",
+    "python.defaultInterpreterPath": "/Users/alexlangshur/Documents/Projects.nosync/market-views/env/bin/python",
     "python.analysis.extraPaths": ["/Users/alexlangshur/Documents/Projects.nosync/market-views/src"]
 }

@@ -4,21 +4,18 @@ import time
 
 from src.raw.scrapers.sec import SEC13FScraper
 from src.raw.managers.base import BaseManagerModule
-from src.utils.mapping import MappingModule
 
 
 class SEC13FManager(BaseManagerModule):
     
-    def __init__(self, mapping_module: MappingModule, sec_13f_scraper: SEC13FScraper,
+    def __init__(self, sec_13f_scraper: SEC13FScraper,
                  manifest_file: str='local/manifests/sec.manifest.json',
                  default_history_size: relativedelta=relativedelta(days=1),
                  default_delay_time: int=0):
 
         super().__init__(self.__class__.__name__, manifest_file)
 
-        self.mapping_module = mapping_module
         self.sec_13f_scraper = sec_13f_scraper 
-
         self.default_history_size = default_history_size
         self.default_delay_time = default_delay_time
 
