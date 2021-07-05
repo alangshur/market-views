@@ -8,8 +8,7 @@ from src.aws.base import AWSBaseConnector
 
 class AWSS3Connector(AWSBaseConnector):
 
-    def __init__(self,
-                 raw_manifest_bucket_name: str='market-views-raw-manifest'):
+    def __init__(self):
 
         super().__init__(self.__class__.__name__)
 
@@ -20,15 +19,13 @@ class AWSS3Connector(AWSBaseConnector):
             region_name=self.region_name
         )
 
-        self.raw_manifest_bucket_name = raw_manifest_bucket_name
-
-    def get_raw_manifest(self, manifest_name: str) -> dict:
+    def read_json(self, bucket_name: str, object_name: str) -> dict:
         try:
 
-            # fetch manifest from s3
+            # fetch object from s3
             try: 
-                s3_manifest_object = self.s3_resource.Object(self.raw_manifest_bucket_name, manifest_name)
-                aws_response = s3_manifest_object.get()
+                s3_object = self.s3_resource.Object(bucket_name, object_name)
+                aws_response = s3_object.get()
             except botocore.errorfactory.NoSuchKey: 
                 return None
 
@@ -39,25 +36,25 @@ class AWSS3Connector(AWSBaseConnector):
             else:
 
                 # deserialize manifest
-                serialized_manifest = aws_response['Body'].read().decode('utf-8')
-                manifest = json.loads(serialized_manifest)
-                return manifest
+                serialized_object = aws_response['Body'].read().decode('utf-8')
+                object = json.loads(serialized_object)
+                return object
 
         except Exception as e:
-            self.logger.exception('Exception in get_raw_manifest: {}.'.format(e))
+            self.logger.exception('Exception in get_json: {}.'.format(e))
             return None
         
-    def save_raw_manifest(self, manifest_name: str, manifest: dict) -> bool:
+    def write_json(self, bucket_name: str, object_name: str, object: dict) -> bool:
         try:
 
             # serialize manifest dict
-            serialized_manifest = json.dumps(manifest).encode('utf-8')
-            serialized_manifest = io.BytesIO(serialized_manifest)
+            serialized_object = json.dumps(object).encode('utf-8')
+            serialized_object = io.BytesIO(serialized_object)
 
             # save serialized manifest to s3
-            s3_manifest_object = self.s3_resource.Object(self.raw_manifest_bucket_name, manifest_name)
-            aws_response = s3_manifest_object.put(
-                Body=serialized_manifest
+            s3_object = self.s3_resource.Object(bucket_name, object_name)
+            aws_response = s3_object.put(
+                Body=serialized_object
             )
 
             # parse s3 response
@@ -68,7 +65,7 @@ class AWSS3Connector(AWSBaseConnector):
             return True
 
         except Exception as e:
-            self.logger.exception('Exception in save_raw_manifest: {}.'.format(e))
+            self.logger.exception('Exception in save_object: {}.'.format(e))
             return False
         
 

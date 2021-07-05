@@ -1,4 +1,4 @@
-from typing import Tuple, Optional, Union
+from typing import Tuple, Union
 from requests_html import HTMLSession
 from bs4 import BeautifulSoup, Tag
 from datetime import datetime
@@ -19,7 +19,7 @@ class SEC13FScraper(BaseScraperModule):
         self.filing_url = filing_url
 
     def fetch_filing_ids(self, since_dt: Union[datetime, str], 
-                         form_number: str='13F-HR') -> Optional[Tuple[list, str]]:
+                         form_number: str='13F-HR') -> Tuple[list, str]:
                          
         try:
 
@@ -59,7 +59,7 @@ class SEC13FScraper(BaseScraperModule):
             self.logger.exception('Exception in fetch_filing_ids: {}.'.format(e))
             return None
 
-    def fetch_filing_data(self, filing_id: str) -> Optional[Tuple[dict, dict]]:
+    def fetch_filing_data(self, filing_id: str) -> Tuple[dict, dict]:
         try:
 
             # load and render webpage

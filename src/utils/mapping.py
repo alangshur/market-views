@@ -17,21 +17,25 @@ class MappingModule(BaseModuleWithLogging):
 
         # load mappings
         self.mappings = {}
-        self._load_sec_tickers_mapping()
+        self._load_cik_to_ticker_mapping()
+
+    def get_mapping_keys(self) -> list:
+        return list(self.mappings.keys())
 
     def get_mapping(self, mapping_key: str) -> dict:
         if mapping_key in self.mappings: return self.mappings[mapping_key]
         else: return None
 
-    def _load_sec_tickers_mapping(self) -> None:
+    def get_ticker_from_cik(self, cik: str) -> dict:
+        return self.mappings['cik_to_ticker'].get(cik)
+
+    def _load_cik_to_ticker_mapping(self) -> None:
         try:
 
             # download SEC tickers mapping
             response = requests.get(self.sec_tickers_mapping_url)
             tickers_data = response.json()
             assert(len(tickers_data) > 0)
-            self.mappings['sec_tickers_mapping'] = tickers_data
-            
             self.logger.info('Downloaded SEC tickers mapping.')
 
         except Exception as e:
@@ -41,5 +45,14 @@ class MappingModule(BaseModuleWithLogging):
             f = open(self.sec_tickers_mapping_path, 'r')
             tickers_data = json.load(f)
             f.close()
-
             self.logger.warning('Loaded SEC tickers mapping locally.')
+
+        # build mapping
+        cik_to_ticker_mapping = {}
+        for v in tickers_data.values():
+            cik_to_ticker_mapping[v['cik_str']] = {
+                'ticker': v['ticker'],
+                'title': v['title']
+            }
+
+        self.mappings['cik_to_ticker'] = cik_to_ticker_mapping
