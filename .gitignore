@@ -3,6 +3,10 @@
 __pycache__
 venv
 env
+.pyc
 
 # apple
 .DS_Store
+
+# files
+cache/

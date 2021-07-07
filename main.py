@@ -1,22 +1,27 @@
-from datetime import datetime
-
 from src.aws.s3 import AWSS3Connector
-
+from src.api.polygon import APIPolygonConnector
 from src.raw.scrapers.sec import SEC13FScraper
-from src.raw.managers.sec import SEC13FManager 
+from src.raw.managers.sec import SEC13FManager
 
-aws_s3_connector = AWSS3Connector()
+s3_connector = AWSS3Connector()
 
-sec_13f_manifest_s3_bucket_name = 'market-views-raw-manifest'
-sec_13f_manifest_s3_object_name = 'sec-13f-manifest.json'
+polygon_connector = APIPolygonConnector(
+    credentials_file_path='config/polygon.json'
+)
 
 sec_13f_scraper = SEC13FScraper()
+
 sec_13f_manager = SEC13FManager(
     sec_13f_scraper=sec_13f_scraper, 
-    aws_s3_connector=aws_s3_connector, 
-    manifest_s3_bucket_name=sec_13f_manifest_s3_bucket_name,
-    manifest_s3_object_name=sec_13f_manifest_s3_object_name
+    s3_connector=s3_connector, 
+    polygon_connector=polygon_connector,
+    manifest_s3_bucket_name='market-views-raw-manifest',
+    manifest_s3_object_name='sec-13f-manifest.json',
+    data_s3_bucket_name='market-views-sec-13f',
+    default_history_size_days=1,
+    default_delay_time_secs=1
 )
 
 filing_data = sec_13f_manager.update()
-print(filing_data)
+monitor_metrics = sec_13f_manager.get_monitor_metrics()
+print(monitor_metrics)

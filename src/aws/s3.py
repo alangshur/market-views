@@ -1,5 +1,5 @@
+from botocore.exceptions import ClientError
 import boto3
-import botocore
 import json
 import io
 
@@ -9,7 +9,6 @@ from src.aws.base import AWSBaseConnector
 class AWSS3Connector(AWSBaseConnector):
 
     def __init__(self):
-
         super().__init__(self.__class__.__name__)
 
         # connect to s3
@@ -26,7 +25,7 @@ class AWSS3Connector(AWSBaseConnector):
             try: 
                 s3_object = self.s3_resource.Object(bucket_name, object_name)
                 aws_response = s3_object.get()
-            except botocore.errorfactory.NoSuchKey: 
+            except ClientError:
                 return None
 
             # parse s3 response

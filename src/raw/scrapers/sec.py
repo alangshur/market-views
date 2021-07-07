@@ -19,7 +19,7 @@ class SEC13FScraper(BaseScraperModule):
         self.filing_url = filing_url
 
     def fetch_filing_ids(self, since_dt: Union[datetime, str], 
-                         form_number: str='13F-HR') -> Tuple[list, str]:
+                         form_number: str='13F-HR') -> Tuple[list, list, datetime]:
                          
         try:
 
@@ -35,7 +35,7 @@ class SEC13FScraper(BaseScraperModule):
                 'dt': dt
             })
             r.raise_for_status()
-            r.html.render()
+            r.html.render(timeout=30)
             session.close()
 
             # parse string into html
@@ -59,14 +59,14 @@ class SEC13FScraper(BaseScraperModule):
             self.logger.exception('Exception in fetch_filing_ids: {}.'.format(e))
             return None
 
-    def fetch_filing_data(self, filing_id: str) -> Tuple[dict, dict]:
+    def fetch_filing_data(self, filing_id: str) -> Tuple[dict, list]:
         try:
 
             # load and render webpage
             session = HTMLSession()
             r = session.get(self.filing_url + filing_id + '/' + filing_id + '.txt')
             r.raise_for_status()
-            r.html.render()
+            r.html.render(timeout=30)
             session.close()
 
             # parse string into html
@@ -75,20 +75,19 @@ class SEC13FScraper(BaseScraperModule):
 
             # extract filing ids
             xml_filing_data = content_html.findAll('xml')
-            if len(xml_filing_data) != 2: 
-                raise Exception('unexpected number of xml documents')
+            if len(xml_filing_data) == 0: return None
             
             # extract filing/holdings data
             filing_data, holdings_data = xml_filing_data
             filing_data = self._extract_filing_data(filing_data)
             holdings_data = self._extract_filing_holdings_data(holdings_data)
-            if len(filing_data) == 0: raise Exception('no filing data returned')
-            if len(holdings_data) == 0: raise Exception('no holdings data returned')
+            if len(filing_data) == 0: return None
+            if len(holdings_data) == 0: return None
 
             return filing_data, holdings_data
 
         except Exception as e:
-            self.logger.exception('Exception in fetch_filing_data_links: {}.'.format(e))
+            self.logger.exception('Exception in fetch_filing_data: {}.'.format(e))
             return None
 
     def _extract_filing_data(self, filing_data: Tag) -> dict:
@@ -116,7 +115,7 @@ class SEC13FScraper(BaseScraperModule):
             'total_holdings_value': total_holdings_value
         }
 
-    def _extract_filing_holdings_data(self, holdings_data: Tag) -> dict:
+    def _extract_filing_holdings_data(self, holdings_data: Tag) -> list:
 
         # extract holdings data
         issuer_name_s = holdings_data.findAll('nameofissuer') + holdings_data.findAll('ns1:nameofissuer')
