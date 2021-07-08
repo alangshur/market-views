@@ -18,7 +18,7 @@ sec_13f_manager = SEC13FManager(
     manifest_s3_bucket_name='market-views-raw-manifest',
     manifest_s3_object_name='sec-13f-manifest.json',
     data_s3_bucket_name='market-views-sec-13f',
-    default_history_size_days=1,
+    default_history_size_days=80,
     default_delay_time_secs=1
 )
 

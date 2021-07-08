@@ -75,7 +75,7 @@ class SEC13FScraper(BaseScraperModule):
 
             # extract filing ids
             xml_filing_data = content_html.findAll('xml')
-            if len(xml_filing_data) == 0: return None
+            if len(xml_filing_data) != 2: return None
             
             # extract filing/holdings data
             filing_data, holdings_data = xml_filing_data
