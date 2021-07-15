@@ -1,11 +1,10 @@
 from abc import abstractmethod
-from typing import Any
 
 from src.aws.s3 import AWSS3Connector
 from src.utils.logger import BaseModuleWithLogging
 
 
-class BaseManagerModule(BaseModuleWithLogging):
+class BaseLoaderModule(BaseModuleWithLogging):
 
     def __init__(self, name: str, s3_connector: AWSS3Connector, 
                  manifest_s3_bucket_name: str, manifest_s3_object_name: str,
@@ -19,7 +18,7 @@ class BaseManagerModule(BaseModuleWithLogging):
         self.monitor_metrics = {}
 
     @abstractmethod
-    def update(self) -> None:
+    def update(self) -> bool:
         raise NotImplemented
 
     def get_monitor_metrics(self) -> dict:

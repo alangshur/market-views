@@ -3,13 +3,13 @@ import boto3
 import json
 import io
 
-from src.aws.base import AWSBaseConnector
+from src.aws.base import BaseAWSConnector
 
 
-class AWSS3Connector(AWSBaseConnector):
+class AWSS3Connector(BaseAWSConnector):
 
-    def __init__(self):
-        super().__init__(self.__class__.__name__)
+    def __init__(self, credentials_file_path: str):
+        super().__init__(self.__class__.__name__, credentials_file_path)
 
         # connect to s3
         self.s3_resource = boto3.resource('s3', 

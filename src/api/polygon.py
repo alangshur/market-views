@@ -1,10 +1,10 @@
 import requests
 import time
 
-from src.api.base import APIBaseConnector
+from src.api.base import BaseAPIConnector
 
 
-class APIPolygonConnector(APIBaseConnector):
+class PolygonAPIConnector(BaseAPIConnector):
 
     def __init__(self, credentials_file_path: str):
         super().__init__(self.__class__.__name__, credentials_file_path)
@@ -14,7 +14,8 @@ class APIPolygonConnector(APIBaseConnector):
 
             # check cache
             ticker = self._get_cache('cusip_to_ticker', cusip)
-            if ticker is not None: return ticker
+            if ticker is not None: 
+                return ticker
 
             # send requests
             attempts_count = 0
@@ -38,9 +39,7 @@ class APIPolygonConnector(APIBaseConnector):
             else: ticker = str(json_response['results'][0]['ticker'])
 
             # cache ticker
-            if ticker is not None:
-                self._add_cache('cusip_to_ticker', cusip, ticker)
-            
+            self._add_cache('cusip_to_ticker', cusip, ticker)
             return ticker
 
         except Exception as e:

@@ -6,7 +6,7 @@ import json
 from src.utils.logger import BaseModuleWithLogging
 
 
-class APIBaseConnector(BaseModuleWithLogging):
+class BaseAPIConnector(BaseModuleWithLogging):
 
     def __init__(self, name: str, credentials_file_path: str,
                  load_cache: bool=True):

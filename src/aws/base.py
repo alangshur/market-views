@@ -3,10 +3,9 @@ import json
 from src.utils.logger import BaseModuleWithLogging
 
 
-class AWSBaseConnector(BaseModuleWithLogging):
+class BaseAWSConnector(BaseModuleWithLogging):
 
-    def __init__(self, name: str,
-                 credentials_file_path: str='config/aws.json'):
+    def __init__(self, name: str, credentials_file_path: str):
 
         super().__init__(name)
         self.credentials_file_path = credentials_file_path
