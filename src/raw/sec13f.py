@@ -42,6 +42,7 @@ class SEC13FLoader(BaseLoaderModule):
             fetch_from_dt = fetch_from_dt.astimezone(timezone.utc)
         elif self.fetch_from_override_dt is not None:
             fetch_from_dt = self.fetch_from_override_dt
+            fetch_from_dt = fetch_from_dt.astimezone(timezone.utc)
         else:
             self.logger.error('Failed to load manifest.')
             return False

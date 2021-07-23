@@ -14,28 +14,27 @@ class PolygonAPIConnector(BaseAPIConnector):
 
             # check cache
             ticker = self._get_cache('cusip_to_ticker', cusip)
-            if ticker is not None: 
-                return ticker
-
+            if ticker is not None: return ticker
+            
             # send requests
             attempts_count = 0
             while True:
                 json_response = self._query_tickers_endpoint({
                     'apiKey': self.api_key,
                     'cusip': cusip,
-                    'limit': 2
+                    'limit': 1
                 })
 
                 if json_response is None and attempts_count > 3: 
                     raise Exception('query attempts failed')
-                elif json_response is None: 
+                elif json_response is None:
                     attempts_count += 1
                     time.sleep(1)
                 else:
                     break
     
             # extract ticker
-            if json_response['results'] is None or len(json_response['results']) != 1: ticker = None
+            if json_response['results'] is None or len(json_response['results']) == 0: ticker = ''
             else: ticker = str(json_response['results'][0]['ticker'])
 
             # cache ticker
