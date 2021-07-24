@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 from requests_html import HTMLSession
-from bs4 import BeautifulSoup
+from typing import Tuple, Callable, Any
+from bs4 import BeautifulSoup, Tag
 from dateutil import parser
-from typing import Tuple
 import requests
 import uuid
 
@@ -141,6 +141,20 @@ class SECAPIConnector(BaseAPIConnector):
             next_fetch_from_dt = parser.parse(last_dt_str)
             next_fetch_from_dt = next_fetch_from_dt.astimezone(timezone.utc)
 
+            # clean filings
+            cleaned_filings = []
+            for filing in json_response['filings']:
+
+                # get filing xml
+                filing_documents = filing['documentFormatFiles']
+                xml_url = filing_documents[1]['documentUrl']
+
+                # fetch xml form
+                cleaned_filing = self._fetch_form_4_xml_data(xml_url)
+                cleaned_filings.append(cleaned_filing)
+
+            return cleaned_filings, next_fetch_from_dt
+
         except Exception as e:
             self.logger.exception('Error in query_form_4_filings: ' + str(e))
             return None
@@ -187,12 +201,11 @@ class SECAPIConnector(BaseAPIConnector):
         # get reporting owner data
         form_data['reporting_owner'] = {}
         reporting_owner_information = content.find('reportingowner')
-        form_data['reporting_owner']['cik'] = reporting_owner_information.find('rptownercik')
-        form_data['reporting_owner']['name'] = reporting_owner_information.find('rptownername')
-        form_data['reporting_owner']['is_director'] = bool(int(reporting_owner_information.find('isdirector').get_text()))
-        form_data['reporting_owner']['is_officer'] = bool(int(reporting_owner_information.find('isofficer').get_text()))
-        form_data['reporting_owner']['is_ten_percent_owner'] = bool(int(reporting_owner_information.find('istenpercentowner').get_text()))
-        form_data['reporting_owner']['is_other'] = bool(int(reporting_owner_information.find('isother').get_text()))
+        form_data['reporting_owner']['cik'] = reporting_owner_information.find('rptownercik').get_text()
+        form_data['reporting_owner']['name'] = reporting_owner_information.find('rptownername').get_text()
+        form_data['reporting_owner']['is_director'] = self._validate_tag_value(reporting_owner_information, 'isdirector', self._parse_bool, False) 
+        form_data['reporting_owner']['is_officer'] = self._validate_tag_value(reporting_owner_information, 'isofficer', self._parse_bool, False) 
+        form_data['reporting_owner']['is_ten_percent_owner'] = self._validate_tag_value(reporting_owner_information, 'istenpercentowner', self._parse_bool, False) 
 
         # get non-derivative data
         non_derivative_transactions = []
@@ -206,10 +219,11 @@ class SECAPIConnector(BaseAPIConnector):
                     'security_title': transaction.find('securitytitle').find('value').get_text(),
                     'date': transaction.find('transactiondate').find('value').get_text(),
                     'shares': self._parse_int((transaction.find('transactionshares').find('value').get_text())),
-                    'price': self._parse_float(transaction.find('transactionpricepershare').find('value').get_text()),
                     'type': 'acquired' if transaction.find('transactionacquireddisposedcode').find('value').get_text() == 'A' else 'disposed',
-                    'post_transaction_shares': self._parse_int((transaction.find('sharesownedfollowingtransaction').find('value').get_text())),
-                    'nature_of_ownership': '' if transaction.find('natureofownership') is None else transaction.find('natureofownership').find('value').get_text() 
+
+                    'price': self._validate_tag_value(transaction, 'transactionpricepershare', self._parse_float),
+                    'post_transaction_shares': self._validate_tag_value(transaction, 'sharesownedfollowingtransaction', self._parse_int),
+                    'nature_of_ownership': self._validate_tag_value(transaction, 'natureofownership')
                 })
         
         # add non-derivative transactions
@@ -221,18 +235,19 @@ class SECAPIConnector(BaseAPIConnector):
         if derivative_table is not None and len(derivative_table.get_text()) > 0:
             
             # iterate over derivative transactions
-            transactions = non_derivative_table.findAll('derivativetransaction')
+            transactions = derivative_table.findAll('derivativetransaction')
             for transaction in transactions:
                 derivative_transactions.append({
                     'security_title': transaction.find('securitytitle').find('value').get_text(),
+                    'underlying_security_title': transaction.find('underlyingsecuritytitle').find('value').get_text(),
                     'date': transaction.find('transactiondate').find('value').get_text(),
                     'shares': self._parse_int((transaction.find('transactionshares').find('value').get_text())),
-                    'price': self._parse_float(transaction.find('transactionpricepershare').find('value').get_text()),
-                    'type': 'acquired' if transaction.find('transactionacquireddisposedcode').find('value').get_text() == 'A' else 'disposed',
-                    'underlying_security_title': transaction.find('underlyingsecuritytitle').find('value').get_text(),
                     'underlying_shares': self._parse_int(transaction.find('underlyingsecurityshares').find('value').get_text()),
-                    'post_transaction_shares': self._parse_int((transaction.find('sharesownedfollowingtransaction').find('value').get_text())),
-                    'nature_of_ownership': '' if transaction.find('natureofownership') is None else transaction.find('natureofownership').find('value').get_text() 
+                    'type': 'acquired' if transaction.find('transactionacquireddisposedcode').find('value').get_text() == 'A' else 'disposed',
+            
+                    'price': self._validate_tag_value(transaction, 'transactionpricepershare', self._parse_float),
+                    'post_transaction_shares': self._validate_tag_value(transaction, 'sharesownedfollowingtransaction', self._parse_int),
+                    'nature_of_ownership': self._validate_tag_value(transaction, 'natureofownership')
                 })
 
         # add derivative transactions
@@ -242,12 +257,26 @@ class SECAPIConnector(BaseAPIConnector):
         
     def _parse_int(self, value: str) -> int:
         try: return int(value)
-        except Exception: return None
+        except Exception: return 0
 
     def _parse_float(self, value: str) -> float:
         try: return float(value)
-        except Exception: return None
+        except Exception: return 0.0
 
-    
+    def _parse_bool(self, value: str) -> bool:
+        if value == 'true': return True
+        elif value == 'false': return False
+        else: return bool(int(value))
 
+    def _validate_tag_value(self, tag: Tag, key: str, 
+                            conversion: Callable=None,
+                            default_value: Any='') -> float:
         
+        outer_tag = tag.find(key)
+        if outer_tag is None: return default_value
+        else:
+            inner_tag = outer_tag.find('value')
+            if inner_tag is None: return default_value
+            else:
+                if conversion is None: return inner_tag.get_text()
+                else: return conversion(inner_tag.get_text())
