@@ -1,10 +1,13 @@
 from datetime import datetime, timezone
+from threading import Condition
 from requests_html import HTMLSession
 from typing import Tuple, Callable, Any
 from bs4 import BeautifulSoup, Tag
 from dateutil import parser
+from tqdm import tqdm
 import requests
 import uuid
+import time
 
 from src.api.base import BaseAPIConnector
 from src.api.polygon import PolygonAPIConnector
@@ -16,7 +19,8 @@ class SECAPIConnector(BaseAPIConnector):
         super().__init__(self.__class__.__name__, credentials_file_path)
         
     def query_13f_filings(self, fetch_from_dt: datetime,
-                          polygon_connector: PolygonAPIConnector) -> Tuple[list, datetime]:
+                          polygon_connector: PolygonAPIConnector,
+                          progress_bar: bool=True) -> Tuple[list, datetime]:
 
         try:
 
@@ -57,7 +61,7 @@ class SECAPIConnector(BaseAPIConnector):
 
             # clean filings
             cleaned_filings = []
-            for filing in json_response['filings']:
+            for filing in tqdm(json_response['filings'], disable=not progress_bar):
 
                 # skip missing holdings
                 if 'holdings' not in filing or 'periodOfReport' not in filing:
@@ -80,8 +84,12 @@ class SECAPIConnector(BaseAPIConnector):
                         'cusip': cusip,
                         'ticker': ticker,
                         'value': float(holding['value']),
-                        'shares': int(holding['shrsOrPrnAmt']['sshPrnamt'])
+                        'shares': int(float(holding['shrsOrPrnAmt']['sshPrnamt']))
                     })
+
+                # validate metadata fields
+                if not self._validate_date(filing['periodOfReport']): continue
+                elif len(filing['cik']) == 0: return None
 
                 # clean filing data
                 cleaned_filings.append({
@@ -103,7 +111,10 @@ class SECAPIConnector(BaseAPIConnector):
             self.logger.exception('Error in query_13f_filings: ' + str(e))
             return None
 
-    def query_form_4_filings(self, fetch_from_dt: datetime) -> Tuple[list, datetime]:
+    def query_form_4_filings(self, fetch_from_dt: datetime,
+                             fetch_delay_secs: int=0,
+                             progress_bar: bool=True) -> Tuple[list, datetime]:
+                             
         try:
             
             # format fetch from dt
@@ -143,7 +154,7 @@ class SECAPIConnector(BaseAPIConnector):
 
             # clean filings
             cleaned_filings = []
-            for filing in json_response['filings']:
+            for filing in tqdm(json_response['filings'], disable=not progress_bar):
 
                 # get filing xml
                 filing_documents = filing['documentFormatFiles']
@@ -151,7 +162,9 @@ class SECAPIConnector(BaseAPIConnector):
 
                 # fetch xml form
                 cleaned_filing = self._fetch_form_4_xml_data(xml_url)
-                cleaned_filings.append(cleaned_filing)
+                if cleaned_filing is not None: 
+                    cleaned_filings.append(cleaned_filing)
+                time.sleep(fetch_delay_secs)
 
             return cleaned_filings, next_fetch_from_dt
 
@@ -197,6 +210,10 @@ class SECAPIConnector(BaseAPIConnector):
         form_data['issuer']['cik'] = issuer_information.find('issuercik').get_text()
         form_data['issuer']['ticker'] = issuer_information.find('issuertradingsymbol').get_text()
         form_data['issuer']['name'] = issuer_information.find('issuername').get_text()
+
+        # validate metadata fields
+        if not self._validate_date(form_data['report_period']): return None
+        elif len(form_data['issuer']['ticker']) == 0: return None
 
         # get reporting owner data
         form_data['reporting_owner'] = {}
@@ -256,17 +273,24 @@ class SECAPIConnector(BaseAPIConnector):
         return form_data
         
     def _parse_int(self, value: str) -> int:
-        try: return int(value)
-        except Exception: return 0
+        try: return int(float(value))
+        except Exception: return None
 
     def _parse_float(self, value: str) -> float:
         try: return float(value)
-        except Exception: return 0.0
+        except Exception: return None
 
     def _parse_bool(self, value: str) -> bool:
         if value == 'true': return True
         elif value == 'false': return False
         else: return bool(int(value))
+
+    def _validate_date(self, value: str) -> bool:
+        try:
+            parser.parse(value)
+            return True
+        except Exception:
+            return False
 
     def _validate_tag_value(self, tag: Tag, key: str, 
                             conversion: Callable=None,
