@@ -1,4 +1,7 @@
 {
     "api-key": "YEQZpQEvMjhVQ3NI_PZhBoruIl4VrCae",
-    "api-domain": "https://api.polygon.io/v3/reference/"
+    "api-domain": "https://api.polygon.io/v3/reference/",
+    "api-domain-v2": "https://api.polygon.io/v3/reference/",
+    "api-domain-meta": "https://api.polygon.io/v1/meta/",
+    "api-domain-status": "https://api.polygon.io/v1/marketstatus/"
 }

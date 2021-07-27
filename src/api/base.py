@@ -3,6 +3,8 @@ from pathlib import Path
 import atexit
 import json
 
+from requests import api
+
 from src.utils.logger import BaseModuleWithLogging
 
 
@@ -20,6 +22,7 @@ class BaseAPIConnector(BaseModuleWithLogging):
         api_credentials = json.load(f)
         self.api_key = api_credentials['api-key']
         self.api_domain = api_credentials['api-domain']
+        self.api_credentials = api_credentials
         f.close()
 
         # initialize cache
