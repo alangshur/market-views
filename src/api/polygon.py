@@ -22,7 +22,7 @@ class PolygonAPIConnector(BaseAPIConnector):
             self.logger.exception('Error in get_market_status: ' + str(e))
             return None
     
-    def get_upcoming_holidays(self) -> dict:
+    def get_upcoming_holidays(self) -> list:
         try:
             return self._query_endpoint(
                 endpoint_name='upcoming',    
@@ -101,7 +101,7 @@ class PolygonAPIConnector(BaseAPIConnector):
     def get_locales(self) -> list:
         try:
             return self._query_endpoint(
-                endpoint_name='locales',    
+                endpoint_name='locales',
                 alt_domain=self.api_credentials['api-domain-v2']
             )
 
@@ -109,17 +109,56 @@ class PolygonAPIConnector(BaseAPIConnector):
             self.logger.exception('Error in get_locales: ' + str(e))
             return None
     
-    def get_all_tickers(self) -> dict:
-        try:
-            
-            json_response = self._query_tickers_endpoint({
-                'apiKey': self.api_key,
-                'limit': 1000,
-                'type': 'CS'
-            })
+    def get_all_tickers(self,
+                        max_iters: int=50) -> dict:
 
-            if json_response is None:
-                raise Exception('query attempts failed')
+        try:
+            tickers = []
+
+            # send initial request
+            response = requests.get(
+                url=self.api_domain + 'tickers', 
+                params={
+                    'apiKey': self.api_key,
+                    'limit': 1000,
+                    'type': 'CS'
+                }
+            )
+
+            # verify response
+            response.raise_for_status()
+            json_response = response.json()
+            assert(json_response['status'] == 'OK')
+            assert(json_response['count'] > 0)
+            assert(len(json_response['next_url']) > 0)
+            tickers.extend(json_response['results'])
+            next_url = json_response['next_url']
+
+            # iteratively request cursor
+            iters = 0
+            while True:
+            
+                # send initial request
+                response = requests.get(
+                    url=next_url, 
+                    headers={
+                        'Authorization': 'Bearer ' + self.api_key
+                    }
+                )
+
+                # verify response
+                response.raise_for_status()
+                json_response = response.json()
+                assert(json_response['status'] == 'OK')
+                assert(json_response['count'] > 0)
+                tickers.extend(json_response['results'])
+
+                # check next url
+                if 'next_url' not in json_response: return tickers
+                elif iters >= max_iters: raise Exception('max iterations exceeded')
+                else: 
+                    next_url = json_response['next_url']
+                    iters += 1
 
         except Exception as e:
             self.logger.exception('Error in get_all_tickers: ' + str(e))

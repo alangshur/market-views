@@ -11,4 +11,9 @@ class MappingModule(BaseModuleWithLogging):
 
         self.polygon_connector = polygon_connector
 
-    
+    def build_mapping(self):
+        try:
+            pass
+        except Exception as e:
+            self.logger.exception('Error in build_mapping: ' + str(e))
+            return None
