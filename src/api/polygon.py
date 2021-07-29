@@ -110,7 +110,7 @@ class PolygonAPIConnector(BaseAPIConnector):
             return None
     
     def get_all_tickers(self,
-                        max_iters: int=50) -> dict:
+                        max_iters: int=15) -> list:
 
         try:
             tickers = []
