@@ -5,11 +5,8 @@ import uuid
 
 class MultiIndex(object):
 
-    def __init__(self, index_keys: list, 
-                 regular_keys: list=[]):
-
+    def __init__(self, index_keys: list):
         self.index_keys = index_keys
-        self.regular_keys = regular_keys
         assert(len(self.index_keys) > 0)
 
         # define index tables
@@ -46,13 +43,11 @@ class MultiIndex(object):
                 index_keys_copy.remove(k)
                 if v in self.index_tables[k]:
                     raise Exception('collision on index key {}'.format(k))
-            elif k not in self.regular_keys:
-                raise Exception('invalid key')
         if len(index_keys_copy) > 0:
             raise Exception('not all index keys specified')
 
         # insert object indices
-        hash_key = uuid.uuid4()
+        hash_key = str(uuid.uuid4())
         for k, v in obj.items():
             if k in self.index_keys:
                 self.index_tables[k].add(v)
@@ -83,4 +78,8 @@ class MultiIndex(object):
         # remove object
         self.hash_table.pop(hash_key)
 
+    def get_all(self) -> list:
+        return list(self.hash_table.values())
 
+    def get_indices(self) -> list:
+        return self.index_keys
