@@ -121,7 +121,9 @@ class PolygonAPIConnector(BaseAPIConnector):
                 params={
                     'apiKey': self.api_key,
                     'limit': 1000,
-                    'type': 'CS'
+                    'active': True,
+                    'type': 'CS',
+                    'market': 'stocks'
                 }
             )
 

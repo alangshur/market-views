@@ -113,7 +113,7 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
             if cached_item is not None:
                 return cached_item
             
-            # get tickers data
+            # get industries data
             response = requests.get(self.api_domain + 'sic_naics.csv')
             response.raise_for_status()          
             content = str(response.content.decode('utf-8'))
@@ -174,7 +174,7 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
             if cached_item is not None:
                 return cached_item
             
-            # get tickers data
+            # get cusips data
             response = requests.get(self.api_domain + 'cusip_ticker.csv')
             response.raise_for_status()          
             content = str(response.content.decode('utf-8'))
@@ -182,7 +182,7 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
             # parse csv data
             lines = content.splitlines()
             data = [line.split('|') for line in lines]
-            data = data[1:]
+            data = data[1:-1]
             
             # build multi-index
             multi_index = MultiIndex(indices)
@@ -240,7 +240,7 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
             if cached_item is not None:
                 return cached_item
             
-            # get tickers data
+            # get leis data
             response = requests.get(self.api_domain + 'cik_lei.csv')
             response.raise_for_status()          
             content = str(response.content.decode('utf-8'))
@@ -248,7 +248,6 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
             # parse csv data
             lines = content.splitlines()
             data = [line.split('|') for line in lines]
-            print(data)
             data = data[1:]
             
             # build multi-index

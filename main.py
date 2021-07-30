@@ -2,13 +2,15 @@ from datetime import date, datetime, timezone
 
 from src.raw.sec13f import SEC13FLoader
 from src.aws.s3 import AWSS3Connector
+from src.utils.mapping import MappingModule
 from src.api.polygon import PolygonAPIConnector
+from src.api.raf import RankAndFiledAPIConnector
 from src.api.sec import SECAPIConnector
 
 
-s3_connector = AWSS3Connector(credentials_file_path='config/aws.json')
-sec_connector = SECAPIConnector(credentials_file_path='config/sec.json')
-polygon_connector = PolygonAPIConnector(credentials_file_path='config/polygon.json')
+# s3_connector = AWSS3Connector(credentials_file_path='config/aws.json')
+# sec_connector = SECAPIConnector(credentials_file_path='config/sec.json')
+# polygon_connector = PolygonAPIConnector(credentials_file_path='config/polygon.json')
 
 
 # sec_13f_loader = SEC13FLoader(
@@ -31,5 +33,12 @@ polygon_connector = PolygonAPIConnector(credentials_file_path='config/polygon.js
 # output = sec_connector._fetch_form_4_xml_data(url)
 # print(output)
 
-filings = sec_connector.query_form_4_filings(datetime(2019, 1, 1, tzinfo=timezone.utc))
-print(filings)
+# filings = sec_connector.query_form_4_filings(datetime(2019, 1, 1, tzinfo=timezone.utc))
+# print(filings)
+
+
+polygon_connector = PolygonAPIConnector(credentials_file_path='config/polygon.json')
+raf_connector = RankAndFiledAPIConnector(credentials_file_path='config/raf.json')
+mapping_module = MappingModule(polygon_connector, raf_connector)
+multi_index = mapping_module.build_ticker_mappings()
+print(multi_index)

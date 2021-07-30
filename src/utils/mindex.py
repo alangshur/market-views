@@ -5,9 +5,14 @@ import uuid
 
 class MultiIndex(object):
 
-    def __init__(self, index_keys: list):
+    def __init__(self, index_keys: list,
+                 default_index_key: str=None):
+
         self.index_keys = index_keys
+        self.default_index_key = default_index_key
         assert(len(self.index_keys) > 0)
+        if self.default_index_key is not None:
+            assert(self.default_index_key in self.index_keys)
 
         # define index tables
         self.index_tables = {}
@@ -42,7 +47,7 @@ class MultiIndex(object):
             if k in index_keys_copy: 
                 index_keys_copy.remove(k)
                 if v in self.index_tables[k]:
-                    raise Exception('collision on index key {}'.format(k))
+                    raise Exception('collision on index key; \"{}:{}\"'.format(k, v))
         if len(index_keys_copy) > 0:
             raise Exception('not all index keys specified')
 
@@ -55,12 +60,18 @@ class MultiIndex(object):
 
         # insert object
         self.hash_table[hash_key] = obj
+    
+    def get(self, value: Any) -> dict:
+        if self.default_index_key is not None:
+            return self.get(self.default_index_key, value)
+        else:
+            raise Exception('no default index key specified')
 
     def get(self, key: str, value: Any) -> dict:
         if key not in self.index_keys:
-            raise Exception('invalid index key')
+            raise Exception('invalid index key; {}'.format(key))
         elif value not in self.index_tables[key]:
-            raise Exception('index key value not found')
+            raise Exception('index key value not found; \"{}:{}\"'.format(key, value))
         else:
             hash_key = self.lookup_tables[key][value]
             return self.hash_table[hash_key]
@@ -77,6 +88,9 @@ class MultiIndex(object):
         
         # remove object
         self.hash_table.pop(hash_key)
+
+    def __len__(self) -> int:
+        return len(self.hash_table)
 
     def get_all(self) -> list:
         return list(self.hash_table.values())

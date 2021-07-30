@@ -6,8 +6,13 @@ boto3==1.17.105
 botocore==1.20.105
 bs4==0.0.1
 cachetools==4.2.2
+caffeine==0.5
 certifi==2021.5.30
 chardet==4.0.0
+chromedriver==2.24.1
+colorama==0.4.4
+configparser==5.0.2
+crayons==0.4.0
 cssselect==1.1.0
 failstodeliver==0.0.5
 fake-useragent==0.1.11
@@ -23,6 +28,7 @@ idna==2.10
 jmespath==0.10.0
 keras-nightly==2.5.0.dev2021032900
 Keras-Preprocessing==1.1.2
+luhn==0.2.0
 lxml==4.6.3
 Markdown==3.3.4
 numpy==1.19.5
@@ -53,7 +59,9 @@ tqdm==4.61.0
 typing-extensions==3.7.4.3
 urllib3==1.26.5
 w3lib==1.22.0
+webdriver-manager==3.4.2
 webencodings==0.5.1
 websockets==8.1
 Werkzeug==2.0.1
 wrapt==1.12.1
+xvfbwrapper==0.2.9
