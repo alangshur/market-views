@@ -20,8 +20,8 @@ class BaseAPIConnector(BaseModuleWithLogging):
         # load API credentials
         f = open(credentials_file_path, 'r')
         api_credentials = json.load(f)
-        self.api_key = api_credentials['api-key']
-        self.api_domain = api_credentials['api-domain']
+        self.api_key = api_credentials.get('api-key')
+        self.api_domain = api_credentials.get('api-domain')
         self.api_credentials = api_credentials
         f.close()
 
