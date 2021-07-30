@@ -1,3 +1,5 @@
+from datetime import timedelta
+from time import time
 from typing import Any
 import requests
 
@@ -7,8 +9,11 @@ from src.utils.mindex import MultiIndex
 
 class RankAndFiledAPIConnector(BaseAPIConnector):
 
-    def __init__(self, credentials_file_path: str):
+    def __init__(self, credentials_file_path: str,
+                 cache_expiry_delta: timedelta=timedelta(days=1)):
+
         super().__init__(self.__class__.__name__, credentials_file_path)
+        self.cache_expiry_delta = cache_expiry_delta
 
     def get_tickers(self) -> MultiIndex:
         """
@@ -30,6 +35,11 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
         ]
 
         try:
+
+            # check cache
+            cached_item = self._get_cache('get_tickers', 'all')
+            if cached_item is not None:
+                return cached_item
             
             # get tickers data
             response = requests.get(self.api_domain + 'cik_ticker.csv')
@@ -71,6 +81,10 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
                 except Exception:
                     continue
 
+            # cache item
+            self._add_cache('get_tickers', 'all', multi_index, 
+                            expiry_delta=self.cache_expiry_delta)
+
             return multi_index
 
         except Exception as e:
@@ -93,6 +107,11 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
         ]
 
         try:
+
+            # check cache
+            cached_item = self._get_cache('get_industries', 'all')
+            if cached_item is not None:
+                return cached_item
             
             # get tickers data
             response = requests.get(self.api_domain + 'sic_naics.csv')
@@ -122,6 +141,10 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
 
                 except Exception:
                     continue
+        
+            # cache item
+            self._add_cache('get_industries', 'all', multi_index, 
+                            expiry_delta=self.cache_expiry_delta)
 
             return multi_index
 
@@ -145,6 +168,11 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
         ]
 
         try:
+
+            # check cache
+            cached_item = self._get_cache('get_cusips', 'all')
+            if cached_item is not None:
+                return cached_item
             
             # get tickers data
             response = requests.get(self.api_domain + 'cusip_ticker.csv')
@@ -179,6 +207,10 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
 
                 except Exception:
                     continue
+            
+            # cache item
+            self._add_cache('get_cusips', 'all', multi_index, 
+                            expiry_delta=self.cache_expiry_delta)
 
             return multi_index
 
@@ -202,6 +234,11 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
         ]
 
         try:
+
+            # check cache
+            cached_item = self._get_cache('get_leis', 'all')
+            if cached_item is not None:
+                return cached_item
             
             # get tickers data
             response = requests.get(self.api_domain + 'cik_lei.csv')
@@ -235,6 +272,10 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
 
                 except Exception:
                     continue
+                    
+            # cache item
+            self._add_cache('get_leis', 'all', multi_index, 
+                            expiry_delta=self.cache_expiry_delta)
 
             return multi_index
 

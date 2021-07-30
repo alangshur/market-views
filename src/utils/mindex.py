@@ -83,3 +83,11 @@ class MultiIndex(object):
 
     def get_indices(self) -> list:
         return self.index_keys
+
+    def get_all_key_values(self, key: str) -> list:
+        if key in self.index_keys:
+            values = list(self.hash_table.values())
+            key_values = [obj[key] for obj in values]
+            return key_values
+        else:
+            raise Exception('invalid index key')

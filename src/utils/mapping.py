@@ -19,14 +19,16 @@ class MappingModule(BaseModuleWithLogging):
         1. All valid tickers
         2. CUSIP -> ticker
         3. CIK -> ticker
-        4. ISIN -> ticker
-        5. Country Composite FIGI -> ticker
-        6. Global Share Class FIGI -> ticker
+        4. LEI -> ticker
+        5. ISIN -> ticker
+        6. Country Composite FIGI -> ticker
+        7. Global Share Class FIGI -> ticker
+        8. Name -> ticker (fuzzy search)
         """
 
         indices = [
-            'ticker', 'name', # 'cusip', 'cik', 'isin', 
-            'composite_figi', 'share_class_figi'
+            'ticker', 'name', # 'lei', 'cusip', 'cik', 'isin', 
+            'composite_figi', 'share_class_figi', 'name'
         ]
 
         try:

@@ -168,7 +168,7 @@ class PolygonAPIConnector(BaseAPIConnector):
         try:
 
             # check cache
-            ticker = self._get_cache('cusip_to_ticker', cusip)
+            ticker = self._get_cache('query_ticker_with_cusip', cusip)
             if ticker is not None: return ticker
             
             # send requests
@@ -193,7 +193,7 @@ class PolygonAPIConnector(BaseAPIConnector):
             else: ticker = str(json_response['results'][0]['ticker'])
 
             # cache ticker
-            self._add_cache('cusip_to_ticker', cusip, ticker)
+            self._add_cache('query_ticker_with_cusip', cusip, ticker)
             return ticker
 
         except Exception as e:
