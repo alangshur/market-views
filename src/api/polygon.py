@@ -1,7 +1,11 @@
+from datetime import timezone
+from dateutil import parser
 from typing import Any
 import requests
 import time
 
+from src.utils.functional.identifiers import validate_ticker
+from src.utils.mindex import MultiIndex
 from src.api.base import BaseAPIConnector
 
 
@@ -74,18 +78,6 @@ class PolygonAPIConnector(BaseAPIConnector):
         except Exception as e:
             self.logger.exception('Error in get_ticker_types: ' + str(e))
             return None
-
-    def get_exchanges(self) -> list:
-        try:
-            return self._query_endpoint(
-                endpoint_name='exchanges',    
-                alt_domain=self.api_credentials['api-domain-meta'],
-                check_ok=False
-            )
-
-        except Exception as e:
-            self.logger.exception('Error in get_exchanges: ' + str(e))
-            return None
     
     def get_markets(self) -> list:
         try:
@@ -108,12 +100,66 @@ class PolygonAPIConnector(BaseAPIConnector):
         except Exception as e:
             self.logger.exception('Error in get_locales: ' + str(e))
             return None
+
+    def get_internal_exchanges(self) -> MultiIndex:
+        """
+            Returns a multi-index with the following fields for all 
+            internal ticker types:
+
+            - mic (index)
+            - name
+            - type
+            - market
+            - tape_id
+        """
+        
+        try:
+            exchanges_data = self._query_endpoint(
+                endpoint_name='exchanges',    
+                alt_domain=self.api_credentials['api-domain-meta'],
+                check_ok=False
+            )
+
+            # post-process data
+            indices = ['mic']
+            multi_index = MultiIndex(indices)
+            for exchange_data in exchanges_data:
+                try:
+                    multi_index.insert({
+                        'mic': exchange_data['mic'],
+                        'name': exchange_data['name'],
+                        'type': exchange_data['type'],
+                        'market': exchange_data['market'],
+                        'tape_id': exchange_data['tape'],
+                    })
+                except Exception:
+                    continue
+            
+            return multi_index
+
+        except Exception as e:
+            self.logger.exception('Error in get_exchanges: ' + str(e))
+            return None
     
-    def get_all_tickers(self,
-                        max_iters: int=15) -> list:
+    def get_internal_tickers(self,
+                             max_iters: int=15) -> MultiIndex:
+
+        """
+            Returns a multi-index with the following fields for all 
+            internal ticker types:
+
+            - ticker (index)
+            - name
+            - locale
+            - asset_class
+            - primary_exchange
+            - currency_code
+            - figi
+            - last_updated
+        """
 
         try:
-            tickers = []
+            tickers_data = []
 
             # send initial request
             response = requests.get(
@@ -133,7 +179,7 @@ class PolygonAPIConnector(BaseAPIConnector):
             assert(json_response['status'] == 'OK')
             assert(json_response['count'] > 0)
             assert(len(json_response['next_url']) > 0)
-            tickers.extend(json_response['results'])
+            tickers_data.extend(json_response['results'])
             next_url = json_response['next_url']
 
             # iteratively request cursor
@@ -153,17 +199,45 @@ class PolygonAPIConnector(BaseAPIConnector):
                 json_response = response.json()
                 assert(json_response['status'] == 'OK')
                 assert(json_response['count'] > 0)
-                tickers.extend(json_response['results'])
+                tickers_data.extend(json_response['results'])
 
                 # check next url
-                if 'next_url' not in json_response: return tickers
-                elif iters >= max_iters: raise Exception('max iterations exceeded')
+                if 'next_url' not in json_response: 
+                    break
+                elif iters >= max_iters: 
+                    raise Exception('max iterations exceeded')
                 else: 
                     next_url = json_response['next_url']
                     iters += 1
 
+            # post-process data
+            indices = ['ticker']
+            multi_index = MultiIndex(indices)
+            for ticker_data in tickers_data:
+                try:
+                    
+                    # check for figi
+                    if 'composite_figi' in ticker_data: figi = {'figi': ticker_data['composite_figi']}
+                    else: figi = {}
+
+                    # process ticker data 
+                    multi_index.insert({
+                        'ticker': validate_ticker(ticker_data['ticker']),
+                        'name': ticker_data['name'],
+                        'locale': ticker_data['locale'].upper(),
+                        'asset_class': 'stocks',
+                        'primary_exchange': ticker_data['primary_exchange'],
+                        'currency_code': ticker_data['currency_name'].upper(),
+                        'last_updated': parser.parse(ticker_data['last_updated_utc']).astimezone(timezone.utc).isoformat(),
+                        **figi
+                    })
+                except Exception:
+                    continue
+            
+            return multi_index
+
         except Exception as e:
-            self.logger.exception('Error in get_all_tickers: ' + str(e))
+            self.logger.exception('Error in get_internal_tickers: ' + str(e))
             return None
 
     def query_ticker_with_cusip(self, cusip: str) -> str:
@@ -193,6 +267,7 @@ class PolygonAPIConnector(BaseAPIConnector):
             # extract ticker
             if json_response['results'] is None or len(json_response['results']) == 0: ticker = ''
             else: ticker = str(json_response['results'][0]['ticker'])
+            ticker = validate_ticker(ticker)
 
             # cache ticker
             self._add_cache('query_ticker_with_cusip', cusip, ticker)

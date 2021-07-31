@@ -6,6 +6,7 @@ from src.utils.mapping import MappingModule
 from src.api.polygon import PolygonAPIConnector
 from src.api.raf import RankAndFiledAPIConnector
 from src.api.sec import SECAPIConnector
+from src.api.secgov import SECGovAPIConnector
 
 
 # s3_connector = AWSS3Connector(credentials_file_path='config/aws.json')
@@ -39,6 +40,8 @@ from src.api.sec import SECAPIConnector
 
 polygon_connector = PolygonAPIConnector(credentials_file_path='config/polygon.json')
 raf_connector = RankAndFiledAPIConnector(credentials_file_path='config/raf.json')
+sec_gov_connector = SECGovAPIConnector(credentials_file_path='config/secgov.json')
+
 mapping_module = MappingModule(polygon_connector, raf_connector)
 multi_index = mapping_module.build_ticker_mappings()
 print(multi_index)

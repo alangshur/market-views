@@ -1,8 +1,7 @@
 from datetime import timedelta
-from time import time
-from typing import Any
 import requests
 
+from src.utils.functional.identifiers import validate_ticker
 from src.api.base import BaseAPIConnector
 from src.utils.mindex import MultiIndex
 
@@ -21,18 +20,14 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
             legal US tickers:
 
             - ticker (index)
-            - cik (index)
-            - name (ticker)
+            - cik
+            - name
             - irs_number
             - exchange
             - sic
             - headquartered_in
             - incorporated_in
         """
-
-        indices = [
-            'ticker', 'cik', 'name'
-        ]
 
         try:
 
@@ -52,6 +47,7 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
             data = data[1:]
             
             # build multi-index
+            indices = ['ticker']
             multi_index = MultiIndex(indices)
             for row in data:
                 try:
@@ -68,9 +64,8 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
                     else:
                         multi_index.insert({
                             'cik': row[0],
-                            'ticker': row[1],
+                            'ticker': validate_ticker(row[1]),
                             'name': row[2],
-
                             'exchange': row[3],
                             'sic': row[4],
                             'headquartered_in': row[5],
@@ -102,10 +97,6 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
             - naics_classification
         """
 
-        indices = [
-            'sic'
-        ]
-
         try:
 
             # check cache
@@ -124,6 +115,7 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
             data = data[1:]
             
             # build multi-index
+            indices = ['sic']
             multi_index = MultiIndex(indices)
             for row in data:
                 try:
@@ -133,7 +125,6 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
                     else:
                         multi_index.insert({
                             'sic': row[0],
-
                             'sic_classification': row[1],
                             'naics': row[2],
                             'naics_classification': row[3]
@@ -158,14 +149,10 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
             legal ticker types:
 
             - ticker (index)
-            - cik (index)
-            - issuer (index)
-            - cusip (index)
+            - cik
+            - issuer
+            - cusip
         """
-
-        indices = [
-            'ticker', 'cik', 'issuer', 'cusip'
-        ]
 
         try:
 
@@ -185,6 +172,7 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
             data = data[1:-1]
             
             # build multi-index
+            indices = ['ticker']
             multi_index = MultiIndex(indices)
             for row in data:
                 try:
@@ -200,7 +188,7 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
                     else:
                         multi_index.insert({
                             'cik': row[3],
-                            'ticker': row[1],
+                            'ticker': validate_ticker(row[1]),
                             'issuer': row[0],
                             'cusip': row[2]
                         })
@@ -224,14 +212,10 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
             legal ticker types:
 
             - cik (index)
-            - name (index)
-            - lei (index)
+            - name
+            - lei
             - legal_form
         """
-
-        indices = [
-            'cik', 'name', 'lei'
-        ]
 
         try:
 
@@ -251,6 +235,7 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
             data = data[1:]
             
             # build multi-index
+            indices = ['cik']
             multi_index = MultiIndex(indices)
             for row in data:
                 try:

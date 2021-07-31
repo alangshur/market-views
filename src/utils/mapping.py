@@ -4,18 +4,21 @@ import luhn
 from src.utils.logger import BaseModuleWithLogging
 from src.api.polygon import PolygonAPIConnector
 from src.api.raf import RankAndFiledAPIConnector
+from src.api.secgov import SECGovAPIConnector
 from src.utils.mindex import MultiIndex
 
 
 class MappingModule(BaseModuleWithLogging):
 
     def __init__(self, polygon_connector: PolygonAPIConnector, 
-                 raf_connector: RankAndFiledAPIConnector):
+                 raf_connector: RankAndFiledAPIConnector,
+                 sec_gov_connector: SECGovAPIConnector):
 
         super().__init__(self.__class__.__name__)
 
         self.polygon_connector = polygon_connector
         self.raf_connector = raf_connector
+        self.sec_gov_connector = sec_gov_connector
 
     def build_ticker_mappings(self) -> MultiIndex:
         """
@@ -28,16 +31,18 @@ class MappingModule(BaseModuleWithLogging):
             - cik (index)
             - isin (index)
             - lei (index)
-            - composite_figi (index)
-            - share_class_figi (index)
+            - figi (index)
         """
 
         indices = [
-            'ticker', 'name', 'cusip', 'cik', 'isin', 'lei', 
-            'composite_figi', 'share_class_figi'
+            'ticker', 'name', 'cusip', 'cik', 
+            'isin', 'lei', 'figi'
         ]
 
         try:
+
+
+            # TODO: RECONCILE ALL DATA SOURCES WITH NEW GOV DATA
         
             # fetch tickers
             tickers_data = self.polygon_connector.get_all_tickers()
@@ -83,8 +88,7 @@ class MappingModule(BaseModuleWithLogging):
                 #     'cik': raf_ticker_data['cik'],
                 #     'isin': isin,
                 #     'lei': raf_lei_data['lei'],
-                #     'composite_figi': ticker_data['composite_figi'],
-                #     'share_class_figi': ticker_data['share_class_figi']
+                #     'figi': ticker_data['figi']
                 # })
 
             return multi_index

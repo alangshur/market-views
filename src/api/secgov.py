@@ -1,8 +1,10 @@
 from datetime import timedelta, date
-from time import time
 from typing import Any
+from io import BytesIO
 import requests
+import zipfile
 
+from src.utils.functional.identifiers import validate_ticker
 from src.api.base import BaseAPIConnector
 from src.utils.mindex import MultiIndex
 
@@ -21,13 +23,9 @@ class SECGovAPIConnector(BaseAPIConnector):
             legal ticker types from sec.gov:
 
             - ticker (index)
-            - cik (index)
-            - name (index)
+            - cik
+            - name
         """
-
-        indices = [
-            'ticker', 'cik', 'name'
-        ]
 
         try:
 
@@ -36,18 +34,19 @@ class SECGovAPIConnector(BaseAPIConnector):
             if cached_item is not None:
                 return cached_item
             
-            # get tickers data
+            # get ciks data
             response = requests.get(self.api_domain + 'company_tickers.json')
             response.raise_for_status()          
             data = response.json()
             
             # build multi-index
+            indices = ['ticker']
             multi_index = MultiIndex(indices)
             for _, v in data.items():
                 try:
                     multi_index.insert({
+                        'ticker': validate_ticker(v['ticker']),
                         'cik': v['cik_str'],
-                        'ticker': v['ticker'],
                         'name': v['title']
                     })
                 except Exception:
@@ -69,13 +68,9 @@ class SECGovAPIConnector(BaseAPIConnector):
             legal ticker types from sec.gov:
 
             - ticker (index)
-            - cik (index)
-            - name (index)
+            - cusip
+            - name
         """
-
-        indices = [
-            'ticker', 'cik', 'name'
-        ]
 
         try:
 
@@ -87,21 +82,30 @@ class SECGovAPIConnector(BaseAPIConnector):
             # get date code
             cur_date = date.today() - timedelta(days=90)
             date_code = cur_date.strftime('%Y%ma')
-            query_code = 'data/fails-deliver-data/cnsfails' + date_code
+            query_code = 'data/fails-deliver-data/cnsfails' + date_code + '.zip'
 
-            # get tickers data
+            # get cusips data
             response = requests.get(self.api_domain + query_code)
-            response.raise_for_status()          
-            data = response.json()
+            response.raise_for_status()   
+            
+            # parse ZIP file
+            fp = BytesIO(response.content)
+            zip_fp = zipfile.ZipFile(fp, 'r')
+            data_fp = zip_fp.open(zip_fp.namelist()[0])
+            lines = data_fp.read().decode('utf-8').splitlines()
+            data = [line.split('|') for line in lines]
+            data = data[1:-2]
+            zip_fp.close()
             
             # build multi-index
+            indices = ['ticker']
             multi_index = MultiIndex(indices)
-            for _, v in data.items():
+            for row in data:
                 try:
                     multi_index.insert({
-                        'cik': v['cik_str'],
-                        'ticker': v['ticker'],
-                        'name': v['title']
+                        'ticker': validate_ticker(row[2]),
+                        'cusip': row[1],
+                        'name': row[4]
                     })
                 except Exception:
                     continue
