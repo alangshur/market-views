@@ -1,10 +1,11 @@
-from datetime import timezone
+from datetime import timezone, timedelta
 from dateutil import parser
 from typing import Any
+from tqdm import tqdm
 import requests
 import time
 
-from src.utils.functional.identifiers import validate_ticker
+from src.utils.functional.identifiers import check_ticker
 from src.utils.mindex import MultiIndex
 from src.api.base import BaseAPIConnector
 
@@ -122,7 +123,7 @@ class PolygonAPIConnector(BaseAPIConnector):
 
             # post-process data
             indices = ['mic']
-            multi_index = MultiIndex(indices)
+            multi_index = MultiIndex(indices, default_index_key='mic', safe_mode=True)
             for exchange_data in exchanges_data:
                 try:
                     multi_index.insert({
@@ -146,13 +147,13 @@ class PolygonAPIConnector(BaseAPIConnector):
 
         """
             Returns a multi-index with the following fields for all 
-            internal ticker types:
+            internal tickers:
 
             - ticker (index)
             - name
             - locale
             - asset_class
-            - primary_exchange
+            - exchange_mic
             - currency_code
             - figi
             - last_updated
@@ -212,24 +213,24 @@ class PolygonAPIConnector(BaseAPIConnector):
 
             # post-process data
             indices = ['ticker']
-            multi_index = MultiIndex(indices)
+            multi_index = MultiIndex(indices, default_index_key='ticker', safe_mode=True)
             for ticker_data in tickers_data:
                 try:
-                    
-                    # check for figi
-                    if 'composite_figi' in ticker_data: figi = {'figi': ticker_data['composite_figi']}
-                    else: figi = {}
 
-                    # process ticker data 
+                    # check ticker
+                    if not check_ticker(ticker_data['ticker']):
+                        continue
+
+                    # insert ticker
                     multi_index.insert({
-                        'ticker': validate_ticker(ticker_data['ticker']),
+                        'ticker': ticker_data['ticker'],
                         'name': ticker_data['name'],
                         'locale': ticker_data['locale'].upper(),
+                        'figi': None if 'composite_figi' not in ticker_data else ticker_data['composite_figi'],
                         'asset_class': 'stocks',
-                        'primary_exchange': ticker_data['primary_exchange'],
+                        'exchange_mic': ticker_data['primary_exchange'],
                         'currency_code': ticker_data['currency_name'].upper(),
                         'last_updated': parser.parse(ticker_data['last_updated_utc']).astimezone(timezone.utc).isoformat(),
-                        **figi
                     })
                 except Exception:
                     continue
@@ -239,14 +240,104 @@ class PolygonAPIConnector(BaseAPIConnector):
         except Exception as e:
             self.logger.exception('Error in get_internal_tickers: ' + str(e))
             return None
+    
+    def get_internal_ticker_details(self,
+                                    no_cache: bool=False,
+                                    cache_expiry_delta: timedelta=timedelta(days=30),
+                                    progress_bar: bool=False) -> MultiIndex:
+
+        """
+            Returns a multi-index with the following fields for all 
+            internal tickers:
+
+            - ticker (index)
+            - name
+            - cik
+            - figi
+            - lei
+            - bloomberg
+            - sic
+            - sector
+            - industry
+            - country
+            - list_date
+            - ceo
+            - phone
+            - employees
+            - url
+            - description
+            - hq_address
+            - hq_state
+            - hq_country
+        """
+
+        try: 
+
+            # check cache
+            if not no_cache:
+                cached_item = self._get_cache('get_internal_ticker_details', 'all')
+                if cached_item is not None: 
+                    self.logger.info('Loading get_internal_ticker_details from cache.')
+                    return cached_item
+
+            # get internal tickers
+            internal_tickers = self.get_internal_tickers()
+            internal_tickers = internal_tickers.get_all_key_values('ticker')
+                
+            # get ticker details data
+            self.logger.info('Loading get_internal_ticker_details from internet.')
+            indices = ['ticker']
+            multi_index = MultiIndex(indices, default_index_key='ticker', safe_mode=True)
+            for ticker in tqdm(internal_tickers, disable=not progress_bar):
+                try:
+
+                    # query ticker details
+                    ticker_details = self._query_endpoint(
+                        endpoint_name='symbols/{}/company'.format(ticker),    
+                        alt_domain=self.api_credentials['api-domain-meta'],
+                        check_ok=False
+                    )
+
+                    # insert indices
+                    multi_index.insert({
+                        'ticker': ticker_details['symbol'],
+                        'name': ticker_details['name'],
+                        'cik': ticker_details['cik'],
+                        'figi': ticker_details['figi'],
+                        'lei': ticker_details['lei'],
+                        'bloomberg': ticker_details['bloomberg'],
+                        'sic': ticker_details['sic'],
+                        'sector': ticker_details['sector'],
+                        'industry': ticker_details['industry'],
+                        'country': ticker_details['country'].upper(),
+                        'list_date': ticker_details['listdate'],
+                        'ceo': ticker_details['ceo'],
+                        'phone': ticker_details['phone'],
+                        'employees': ticker_details['employees'],
+                        'url': ticker_details['url'],
+                        'description': ticker_details['description'],
+                        'hq_address': ticker_details['hq_address'],
+                        'hq_state': ticker_details['hq_state'],
+                        'hq_country': ticker_details['hq_country']
+                    })
+
+                except Exception:
+                    pass
+                
+            # cache item
+            if not no_cache:
+                self._add_cache('get_internal_ticker_details', 'all', multi_index, 
+                                expiry_delta=cache_expiry_delta)
+
+            return multi_index
+            
+        except Exception as e:
+            self.logger.exception('Error in get_internal_ticker_details: ' + str(e))
+            return None
 
     def query_ticker_with_cusip(self, cusip: str) -> str:
         try:
 
-            # check cache
-            ticker = self._get_cache('query_ticker_with_cusip', cusip)
-            if ticker is not None: return ticker
-            
             # send requests
             attempts_count = 0
             while True:
@@ -256,7 +347,7 @@ class PolygonAPIConnector(BaseAPIConnector):
                     'limit': 1
                 })
 
-                if json_response is None and attempts_count > 3: 
+                if json_response is None and attempts_count > 3:
                     raise Exception('query attempts failed')
                 elif json_response is None:
                     attempts_count += 1
@@ -267,10 +358,7 @@ class PolygonAPIConnector(BaseAPIConnector):
             # extract ticker
             if json_response['results'] is None or len(json_response['results']) == 0: ticker = ''
             else: ticker = str(json_response['results'][0]['ticker'])
-            ticker = validate_ticker(ticker)
-
-            # cache ticker
-            self._add_cache('query_ticker_with_cusip', cusip, ticker)
+            if not check_ticker(ticker): ticker = ''
             return ticker
 
         except Exception as e:

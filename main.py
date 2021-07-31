@@ -30,18 +30,10 @@ from src.api.secgov import SECGovAPIConnector
 # monitor_metrics = sec_13f_loader.get_monitor_metrics()
 # print(monitor_metrics)
 
-# url = 'https://www.sec.gov/Archives/edgar/data/1380106/000110465921094107/tm2122156-19_4seq1.xml'
-# output = sec_connector._fetch_form_4_xml_data(url)
-# print(output)
-
-# filings = sec_connector.query_form_4_filings(datetime(2019, 1, 1, tzinfo=timezone.utc))
-# print(filings)
-
-
 polygon_connector = PolygonAPIConnector(credentials_file_path='config/polygon.json')
 raf_connector = RankAndFiledAPIConnector(credentials_file_path='config/raf.json')
 sec_gov_connector = SECGovAPIConnector(credentials_file_path='config/secgov.json')
 
-mapping_module = MappingModule(polygon_connector, raf_connector)
+mapping_module = MappingModule(polygon_connector, raf_connector, sec_gov_connector)
 multi_index = mapping_module.build_ticker_mappings()
-print(multi_index)
+# print(multi_index.get_all())

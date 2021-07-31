@@ -1,3 +1,4 @@
+import re
 from typing import Any
 import pickle
 import uuid
@@ -31,6 +32,29 @@ class MultiIndex(object):
 
         # define hash table
         self.hash_table = {}
+        self.iteration = 0
+
+    def __len__(self) -> int:
+        return len(self.hash_table)
+    
+    def __iter__(self) -> 'MultiIndex':
+        return self
+
+    def __next__(self) -> dict:
+        objs = self.get_all()
+        if self.iteration >= len(objs):
+            raise StopIteration
+        else:
+            obj = objs[self.iteration]
+            self.iteration += 1
+            return obj
+            
+    def reset(self) -> None:
+        self.iteration = 0
+    
+    def is_finished(self) -> None:
+        objs = self.get_all()
+        return self.iteration >= len(objs)
 
     @staticmethod
     def load(path: str) -> Any:
@@ -68,12 +92,6 @@ class MultiIndex(object):
         # insert object
         self.hash_table[hash_key] = obj
     
-    def get(self, value: Any) -> dict:
-        if self.default_index_key is not None:
-            return self.get(self.default_index_key, value)
-        else:
-            raise Exception('no default index key specified')
-
     def get(self, key: str, value: Any) -> dict:
         if key not in self.index_keys:
             raise Exception('invalid index key; {}'.format(key))
@@ -104,9 +122,6 @@ class MultiIndex(object):
             raise Exception('failed to locate hash key')
         else:
             self.hash_table.pop(hash_key)
-
-    def __len__(self) -> int:
-        return len(self.hash_table)
 
     def get_all(self) -> list:
         return list(self.hash_table.values())

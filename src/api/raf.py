@@ -1,20 +1,20 @@
 from datetime import timedelta
 import requests
 
-from src.utils.functional.identifiers import validate_ticker
+from src.utils.functional.identifiers import check_ticker
 from src.api.base import BaseAPIConnector
 from src.utils.mindex import MultiIndex
 
 
 class RankAndFiledAPIConnector(BaseAPIConnector):
 
-    def __init__(self, credentials_file_path: str,
-                 cache_expiry_delta: timedelta=timedelta(days=1)):
-
+    def __init__(self, credentials_file_path: str):
         super().__init__(self.__class__.__name__, credentials_file_path)
-        self.cache_expiry_delta = cache_expiry_delta
 
-    def get_tickers(self) -> MultiIndex:
+    def get_tickers(self,
+                    no_cache: bool=False,
+                    cache_expiry_delta: timedelta=timedelta(days=1)) -> MultiIndex:
+        
         """
             Returns a multi-index with the following fields for all 
             legal US tickers:
@@ -32,11 +32,14 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
         try:
 
             # check cache
-            cached_item = self._get_cache('get_tickers', 'all')
-            if cached_item is not None:
-                return cached_item
+            if not no_cache:
+                cached_item = self._get_cache('get_tickers', 'all')
+                if cached_item is not None:
+                    self.logger.info('Loading get_tickers from cache.')
+                    return cached_item
             
             # get tickers data
+            self.logger.info('Loading get_tickers from internet.')
             response = requests.get(self.api_domain + 'cik_ticker.csv')
             response.raise_for_status()          
             content = str(response.content.decode('utf-8'))
@@ -48,7 +51,7 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
             
             # build multi-index
             indices = ['ticker']
-            multi_index = MultiIndex(indices)
+            multi_index = MultiIndex(indices, default_index_key='ticker', safe_mode=True)
             for row in data:
                 try:
 
@@ -57,14 +60,14 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
                     name = row[2]
                     exchange = row[3]
                     if len(cik) == 0: continue
-                    elif len(ticker) == 0: continue
+                    elif not check_ticker(ticker): continue
                     elif len(name) == 0: continue
                     elif len(exchange) == 0: continue
                     elif exchange.startswith('OTC'): continue
                     else:
                         multi_index.insert({
                             'cik': row[0],
-                            'ticker': validate_ticker(row[1]),
+                            'ticker': row[1],
                             'name': row[2],
                             'exchange': row[3],
                             'sic': row[4],
@@ -77,8 +80,9 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
                     continue
 
             # cache item
-            self._add_cache('get_tickers', 'all', multi_index, 
-                            expiry_delta=self.cache_expiry_delta)
+            if not no_cache:
+                self._add_cache('get_tickers', 'all', multi_index, 
+                                expiry_delta=cache_expiry_delta)
 
             return multi_index
 
@@ -86,7 +90,10 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
             self.logger.exception('Error in get_tickers: ' + str(e))
             return None
 
-    def get_industries(self) -> MultiIndex:
+    def get_industries(self,
+                       no_cache: bool=False,
+                       cache_expiry_delta: timedelta=timedelta(days=1)) -> MultiIndex:
+
         """
             Returns a multi-index with the following fields for all 
             legal SIC types:
@@ -100,11 +107,14 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
         try:
 
             # check cache
-            cached_item = self._get_cache('get_industries', 'all')
-            if cached_item is not None:
-                return cached_item
-            
+            if not no_cache:
+                cached_item = self._get_cache('get_industries', 'all')
+                if cached_item is not None:
+                    self.logger.info('Loading get_industries from cache.')
+                    return cached_item
+                
             # get industries data
+            self.logger.info('Loading get_industries from internet.')
             response = requests.get(self.api_domain + 'sic_naics.csv')
             response.raise_for_status()          
             content = str(response.content.decode('utf-8'))
@@ -116,7 +126,7 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
             
             # build multi-index
             indices = ['sic']
-            multi_index = MultiIndex(indices)
+            multi_index = MultiIndex(indices, default_index_key='sic', safe_mode=True)
             for row in data:
                 try:
 
@@ -134,8 +144,9 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
                     continue
         
             # cache item
-            self._add_cache('get_industries', 'all', multi_index, 
-                            expiry_delta=self.cache_expiry_delta)
+            if not no_cache:
+                self._add_cache('get_industries', 'all', multi_index, 
+                                expiry_delta=cache_expiry_delta)
 
             return multi_index
 
@@ -143,7 +154,10 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
             self.logger.exception('Error in get_industries: ' + str(e))
             return None
 
-    def get_cusips(self) -> MultiIndex:
+    def get_cusips(self,
+                   no_cache: bool=False,
+                   cache_expiry_delta: timedelta=timedelta(days=1)) -> MultiIndex:
+
         """
             Returns a multi-index with the following fields for all 
             legal ticker types:
@@ -157,11 +171,14 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
         try:
 
             # check cache
-            cached_item = self._get_cache('get_cusips', 'all')
-            if cached_item is not None:
-                return cached_item
-            
+            if not no_cache:
+                cached_item = self._get_cache('get_cusips', 'all')
+                if cached_item is not None:
+                    self.logger.info('Loading get_cusips from cache.')
+                    return cached_item
+                
             # get cusips data
+            self.logger.info('Loading get_cusips from internet.')
             response = requests.get(self.api_domain + 'cusip_ticker.csv')
             response.raise_for_status()          
             content = str(response.content.decode('utf-8'))
@@ -173,7 +190,7 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
             
             # build multi-index
             indices = ['ticker']
-            multi_index = MultiIndex(indices)
+            multi_index = MultiIndex(indices, default_index_key='ticker', safe_mode=True)
             for row in data:
                 try:
 
@@ -182,13 +199,13 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
                     issuer = row[0]
                     cusip = row[2]
                     if len(cik) == 0: continue
-                    elif len(ticker) == 0: continue
+                    elif not check_ticker(ticker): continue
                     elif len(issuer) == 0: continue
                     elif len(cusip) == 0: continue
                     else:
                         multi_index.insert({
                             'cik': row[3],
-                            'ticker': validate_ticker(row[1]),
+                            'ticker': row[1],
                             'issuer': row[0],
                             'cusip': row[2]
                         })
@@ -197,8 +214,9 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
                     continue
             
             # cache item
-            self._add_cache('get_cusips', 'all', multi_index, 
-                            expiry_delta=self.cache_expiry_delta)
+            if not no_cache:
+                self._add_cache('get_cusips', 'all', multi_index, 
+                                expiry_delta=cache_expiry_delta)
 
             return multi_index
 
@@ -206,7 +224,10 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
             self.logger.exception('Error in get_cusips: ' + str(e))
             return None
     
-    def get_leis(self) -> MultiIndex:
+    def get_leis(self,
+                 no_cache: bool=False,
+                 cache_expiry_delta: timedelta=timedelta(days=1)) -> MultiIndex:
+
         """
             Returns a multi-index with the following fields for all 
             legal ticker types:
@@ -220,11 +241,14 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
         try:
 
             # check cache
-            cached_item = self._get_cache('get_leis', 'all')
-            if cached_item is not None:
-                return cached_item
+            if not no_cache:
+                cached_item = self._get_cache('get_leis', 'all')
+                if cached_item is not None:
+                    self.logger.info('Loading get_leis from cache.')
+                    return cached_item
             
             # get leis data
+            self.logger.info('Loading get_leis from internet.')
             response = requests.get(self.api_domain + 'cik_lei.csv')
             response.raise_for_status()          
             content = str(response.content.decode('utf-8'))
@@ -236,7 +260,7 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
             
             # build multi-index
             indices = ['cik']
-            multi_index = MultiIndex(indices)
+            multi_index = MultiIndex(indices, default_index_key='cik', safe_mode=True)
             for row in data:
                 try:
 
@@ -258,8 +282,9 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
                     continue
                     
             # cache item
-            self._add_cache('get_leis', 'all', multi_index, 
-                            expiry_delta=self.cache_expiry_delta)
+            if not no_cache:
+                self._add_cache('get_leis', 'all', multi_index, 
+                                expiry_delta=cache_expiry_delta)
 
             return multi_index
 

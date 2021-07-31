@@ -4,20 +4,20 @@ from io import BytesIO
 import requests
 import zipfile
 
-from src.utils.functional.identifiers import validate_ticker
+from src.utils.functional.identifiers import check_ticker
 from src.api.base import BaseAPIConnector
 from src.utils.mindex import MultiIndex
 
 
 class SECGovAPIConnector(BaseAPIConnector):
 
-    def __init__(self, credentials_file_path: str,
-                 cache_expiry_delta: timedelta=timedelta(days=1)):
-
+    def __init__(self, credentials_file_path: str):
         super().__init__(self.__class__.__name__, credentials_file_path)
-        self.cache_expiry_delta = cache_expiry_delta
 
-    def get_ciks(self) -> MultiIndex:
+    def get_ciks(self,
+                 no_cache: bool=False,
+                 cache_expiry_delta: timedelta=timedelta(days=1)) -> MultiIndex:
+
         """
             Returns a multi-index with the following fields for all 
             legal ticker types from sec.gov:
@@ -30,31 +30,42 @@ class SECGovAPIConnector(BaseAPIConnector):
         try:
 
             # check cache
-            cached_item = self._get_cache('get_ciks', 'all')
-            if cached_item is not None:
-                return cached_item
+            if not no_cache:
+                cached_item = self._get_cache('get_ciks', 'all')
+                if cached_item is not None:
+                    self.logger.info('Loading get_ciks from cache.')
+                    return cached_item
             
             # get ciks data
+            self.logger.info('Loading get_ciks from internet.')
             response = requests.get(self.api_domain + 'company_tickers.json')
-            response.raise_for_status()          
+            response.raise_for_status()
             data = response.json()
             
             # build multi-index
             indices = ['ticker']
-            multi_index = MultiIndex(indices)
+            multi_index = MultiIndex(indices, default_index_key='ticker', safe_mode=True)
             for _, v in data.items():
                 try:
+
+                    # check ticker
+                    if not check_ticker(v['ticker']):
+                        continue
+
+                    # insert ticker
                     multi_index.insert({
-                        'ticker': validate_ticker(v['ticker']),
+                        'ticker': v['ticker'],
                         'cik': v['cik_str'],
                         'name': v['title']
                     })
+
                 except Exception:
                     continue
             
             # cache item
-            self._add_cache('get_ciks', 'all', multi_index, 
-                            expiry_delta=self.cache_expiry_delta)
+            if not no_cache:
+                self._add_cache('get_ciks', 'all', multi_index, 
+                                expiry_delta=cache_expiry_delta)
 
             return multi_index
 
@@ -62,7 +73,10 @@ class SECGovAPIConnector(BaseAPIConnector):
             self.logger.exception('Error in get_ciks: ' + str(e))
             return None
 
-    def get_cusips(self) -> MultiIndex:
+    def get_cusips(self,
+                   no_cache: bool=False,
+                   cache_expiry_delta: timedelta=timedelta(days=1)) -> MultiIndex:
+
         """
             Returns a multi-index with the following fields for all 
             legal ticker types from sec.gov:
@@ -75,9 +89,11 @@ class SECGovAPIConnector(BaseAPIConnector):
         try:
 
             # check cache
-            cached_item = self._get_cache('get_cusips', 'all')
-            if cached_item is not None:
-                return cached_item
+            if not no_cache:
+                cached_item = self._get_cache('get_cusips', 'all')
+                if cached_item is not None:
+                    self.logger.info('Loading get_cusips from cache.')
+                    return cached_item
 
             # get date code
             cur_date = date.today() - timedelta(days=90)
@@ -85,6 +101,7 @@ class SECGovAPIConnector(BaseAPIConnector):
             query_code = 'data/fails-deliver-data/cnsfails' + date_code + '.zip'
 
             # get cusips data
+            self.logger.info('Loading get_cusips from internet.')
             response = requests.get(self.api_domain + query_code)
             response.raise_for_status()   
             
@@ -99,20 +116,28 @@ class SECGovAPIConnector(BaseAPIConnector):
             
             # build multi-index
             indices = ['ticker']
-            multi_index = MultiIndex(indices)
+            multi_index = MultiIndex(indices, default_index_key='ticker', safe_mode=True)
             for row in data:
                 try:
+
+                    # check ticker
+                    if not check_ticker(row[2]):
+                        continue
+
+                    # insert ticker
                     multi_index.insert({
-                        'ticker': validate_ticker(row[2]),
+                        'ticker': row[2],
                         'cusip': row[1],
                         'name': row[4]
                     })
+                    
                 except Exception:
                     continue
             
             # cache item
-            self._add_cache('get_cusips', 'all', multi_index, 
-                            expiry_delta=self.cache_expiry_delta)
+            if not no_cache:
+                self._add_cache('get_cusips', 'all', multi_index, 
+                                expiry_delta=cache_expiry_delta)
 
             return multi_index
 
