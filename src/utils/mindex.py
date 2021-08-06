@@ -4,6 +4,14 @@ import pickle
 import uuid
 
 
+class MultiIndexException(Exception):
+    def __init__(self, message):
+        self.message = message
+
+    def __str__(self):
+        return self.message
+
+
 class MultiIndex(object):
 
     def __init__(self, index_keys: list,
@@ -14,11 +22,11 @@ class MultiIndex(object):
         self.default_index_key = default_index_key
         self.safe_mode = safe_mode
         if len(self.index_keys) == 0:
-            raise Exception('must specify at least on index key')
+            raise MultiIndexException('must specify at least on index key')
         if self.default_index_key is not None and self.default_index_key not in self.index_keys:
-            raise Exception('default index key must be in index keys')
+            raise MultiIndexException('default index key must be in index keys')
         if self.safe_mode and default_index_key is None:
-            raise Exception('default index key must be specified in safe mode')
+            raise MultiIndexException('default index key must be specified in safe mode')
             
         # define index tables
         self.index_tables = {}
@@ -77,11 +85,11 @@ class MultiIndex(object):
             if k in index_keys_copy: 
                 index_keys_copy.remove(k)
                 if v in self.index_tables[k]:
-                    raise Exception('collision on index key: \"{}:{}\"'.format(k, v))
+                    raise MultiIndexException('collision on index key: \"{}:{}\"'.format(k, v))
         if not self.safe_mode and len(index_keys_copy) > 0:
-            raise Exception('not all index keys specified')
+            raise MultiIndexException('not all index keys specified')
         elif self.safe_mode and self.default_index_key in index_keys_copy:
-            raise Exception('default index key must be specified in safe mode')
+            raise MultiIndexException('default index key must be specified in safe mode')
 
         # insert object indices
         hash_key = str(uuid.uuid4())
@@ -97,10 +105,10 @@ class MultiIndex(object):
         if value is None:
             return None
         elif key not in self.index_keys:
-            raise Exception('invalid index key; {}'.format(key))
+            raise MultiIndexException('invalid index key; {}'.format(key))
         elif value not in self.index_tables[key]:
             if self.safe_mode: return None
-            else: raise Exception('index key value not found: \"{}:{}\"'.format(key, value))
+            else: raise MultiIndexException('index key value not found: \"{}:{}\"'.format(key, value))
         else:
             hash_key = self.lookup_tables[key][value]
             return self.hash_table[hash_key]
@@ -110,7 +118,7 @@ class MultiIndex(object):
         # get object
         obj = self.get(key, value)
         if obj is None:
-            raise Exception('index key value not found: \"{}:{}\"'.format(key, value))
+            raise MultiIndexException('index key value not found: \"{}:{}\"'.format(key, value))
 
         # remove object indices
         hash_key = None
@@ -122,7 +130,7 @@ class MultiIndex(object):
             
         # remove object
         if hash_key is None:
-            raise Exception('failed to locate hash key')
+            raise MultiIndexException('failed to locate hash key')
         else:
             self.hash_table.pop(hash_key)
 
@@ -138,4 +146,4 @@ class MultiIndex(object):
             key_values = [obj[key] for obj in values]
             return key_values
         else:
-            raise Exception('invalid index key')
+            raise MultiIndexException('invalid index key')

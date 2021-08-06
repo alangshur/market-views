@@ -2,7 +2,7 @@ import luhn
 
 from src.utils.functional.identifiers import nn, convert_letters_to_string_numbers
 from src.utils.logger import BaseModuleWithLogging
-from src.utils.mindex import MultiIndex
+from src.utils.mindex import MultiIndex, MultiIndexException
 from src.api.polygon import PolygonAPIConnector
 from src.api.raf import RankAndFiledAPIConnector
 from src.api.secgov import SECGovAPIConnector
@@ -82,6 +82,16 @@ class MappingModule(BaseModuleWithLogging):
             if gleif_lei_data is None:
                 raise Exception('missing GEIF lei data')
 
+            # fetch exchange data
+            exchange_data = self.polygon_connector.get_internal_exchanges()
+            if exchange_data is None:
+                raise Exception('missing exchange data')
+
+            # fetch sector data
+            industry_data = self.raf_connector.get_industries()
+            if industry_data is None:
+                raise Exception('missing industry data')
+
             # build multi-index
             multi_index = MultiIndex(indices, default_index_key='ticker', safe_mode=True)
             for ticker_data_obj in ticker_data:
@@ -145,17 +155,43 @@ class MappingModule(BaseModuleWithLogging):
                     if nn(bloomberg_gid): ticker_mapping['bloomberg_gid'] = bloomberg_gid
                     if nn(irs_number): ticker_mapping['irs_number'] = irs_number
 
-                    # insert ticker details
+                    # insert ticker data
                     ticker_mapping['locale'] = ticker_data_obj['locale']
                     ticker_mapping['asset_class'] = ticker_data_obj['asset_class']
                     ticker_mapping['currency_code'] = ticker_data_obj['currency_code']
                     ticker_mapping['last_updated'] = ticker_data_obj['last_updated']
 
-
+                    # insert ticker details data
+                    if nn(ticker_details_data_obj):
+                        ticker_mapping['details'] = {}
+                        ticker_mapping['details']['sector'] = ticker_details_data_obj['sector']
+                        ticker_mapping['details']['list_date'] = ticker_details_data_obj['list_date']
+                        ticker_mapping['details']['ceo'] = ticker_details_data_obj['ceo']
+                        ticker_mapping['details']['phone'] = ticker_details_data_obj['phone']
+                        ticker_mapping['details']['employees'] = ticker_details_data_obj['employees']
+                        ticker_mapping['details']['url'] = ticker_details_data_obj['url']
+                        ticker_mapping['details']['description'] = ticker_details_data_obj['description']
+                        ticker_mapping['details']['address'] = ticker_details_data_obj['hq_address']
+                        ticker_mapping['details']['state'] = ticker_details_data_obj['hq_state']
+                        ticker_mapping['details']['country'] = ticker_details_data_obj['hq_country']
                     
+                    # get exchange data
+                    mic = ticker_data_obj['exchange_mic']
+                    exchange_data_obj = exchange_data.get('mic', mic)
+                    if nn(exchange_data_obj): ticker_mapping['exchange'] = exchange_data_obj
+                    else: ticker_mapping['exchange'] = None
+
+                    # get industry data
+                    if nn(ticker_details_data_obj) and nn(ticker_details_data_obj['sic']): sic = ticker_details_data_obj['sic']
+                    elif nn(raf_ticker_data_obj): sic = raf_ticker_data_obj['sic']
+                    else: sic = None
+                    industry_data_obj = industry_data.get('sic', sic)
+                    if nn(industry_data_obj): ticker_mapping['industry'] = industry_data_obj
+
+                    # insert mapping
                     multi_index.insert(ticker_mapping)
                     
-                except Exception:
+                except MultiIndexException:
                     continue
 
             return multi_index

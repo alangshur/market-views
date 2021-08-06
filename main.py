@@ -1,5 +1,3 @@
-from datetime import date, datetime, timezone
-
 from src.utils.functional.identifiers import print_mapping_identifier_stats
 from src.raw.sec13f import SEC13FLoader
 from src.aws.s3 import AWSS3Connector
@@ -9,6 +7,7 @@ from src.api.raf import RankAndFiledAPIConnector
 from src.api.sec import SECAPIConnector
 from src.api.secgov import SECGovAPIConnector
 from src.api.gleif import GLEIFAPIConnector
+
 
 # s3_connector = AWSS3Connector(credentials_file_path='config/aws.json')
 # sec_connector = SECAPIConnector(credentials_file_path='config/sec.json')
