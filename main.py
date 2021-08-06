@@ -1,5 +1,6 @@
 from datetime import date, datetime, timezone
 
+from src.utils.functional.identifiers import print_mapping_identifier_stats
 from src.raw.sec13f import SEC13FLoader
 from src.aws.s3 import AWSS3Connector
 from src.utils.mapping import MappingModule
@@ -7,7 +8,7 @@ from src.api.polygon import PolygonAPIConnector
 from src.api.raf import RankAndFiledAPIConnector
 from src.api.sec import SECAPIConnector
 from src.api.secgov import SECGovAPIConnector
-
+from src.api.gleif import GLEIFAPIConnector
 
 # s3_connector = AWSS3Connector(credentials_file_path='config/aws.json')
 # sec_connector = SECAPIConnector(credentials_file_path='config/sec.json')
@@ -30,10 +31,12 @@ from src.api.secgov import SECGovAPIConnector
 # monitor_metrics = sec_13f_loader.get_monitor_metrics()
 # print(monitor_metrics)
 
+
 polygon_connector = PolygonAPIConnector(credentials_file_path='config/polygon.json')
 raf_connector = RankAndFiledAPIConnector(credentials_file_path='config/raf.json')
 sec_gov_connector = SECGovAPIConnector(credentials_file_path='config/secgov.json')
+gleif_connector = GLEIFAPIConnector(credentials_file_path='config/gleif.json')
 
-mapping_module = MappingModule(polygon_connector, raf_connector, sec_gov_connector)
+mapping_module = MappingModule(polygon_connector, raf_connector, sec_gov_connector, gleif_connector)
 multi_index = mapping_module.build_ticker_mappings()
-# print(multi_index.get_all())
+print_mapping_identifier_stats(multi_index)

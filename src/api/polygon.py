@@ -5,7 +5,7 @@ from tqdm import tqdm
 import requests
 import time
 
-from src.utils.functional.identifiers import check_ticker
+from src.utils.functional.identifiers import check_ticker, to_string
 from src.utils.mindex import MultiIndex
 from src.api.base import BaseAPIConnector
 
@@ -127,8 +127,8 @@ class PolygonAPIConnector(BaseAPIConnector):
             for exchange_data in exchanges_data:
                 try:
                     multi_index.insert({
-                        'mic': exchange_data['mic'],
-                        'name': exchange_data['name'],
+                        'mic': to_string(exchange_data['mic']),
+                        'name': to_string(exchange_data['name']),
                         'type': exchange_data['type'],
                         'market': exchange_data['market'],
                         'tape_id': exchange_data['tape'],
@@ -223,13 +223,13 @@ class PolygonAPIConnector(BaseAPIConnector):
 
                     # insert ticker
                     multi_index.insert({
-                        'ticker': ticker_data['ticker'],
-                        'name': ticker_data['name'],
-                        'locale': ticker_data['locale'].upper(),
-                        'figi': None if 'composite_figi' not in ticker_data else ticker_data['composite_figi'],
+                        'ticker': to_string(ticker_data['ticker']),
+                        'name': to_string(ticker_data['name']),
+                        'figi': None if 'composite_figi' not in ticker_data else to_string(ticker_data['composite_figi']),
+                        'locale': to_string(ticker_data['locale']).upper(),
                         'asset_class': 'stocks',
-                        'exchange_mic': ticker_data['primary_exchange'],
-                        'currency_code': ticker_data['currency_name'].upper(),
+                        'exchange_mic': to_string(ticker_data['primary_exchange']),
+                        'currency_code': to_string(ticker_data['currency_name']).upper(),
                         'last_updated': parser.parse(ticker_data['last_updated_utc']).astimezone(timezone.utc).isoformat(),
                     })
                 except Exception:
@@ -300,13 +300,13 @@ class PolygonAPIConnector(BaseAPIConnector):
 
                     # insert indices
                     multi_index.insert({
-                        'ticker': ticker_details['symbol'],
-                        'name': ticker_details['name'],
-                        'cik': ticker_details['cik'],
-                        'figi': ticker_details['figi'],
-                        'lei': ticker_details['lei'],
-                        'bloomberg': ticker_details['bloomberg'],
-                        'sic': ticker_details['sic'],
+                        'ticker': to_string(ticker_details['symbol']),
+                        'name': to_string(ticker_details['name']),
+                        'cik': to_string(ticker_details['cik']),
+                        'figi': to_string(ticker_details['figi']),
+                        'lei': to_string(ticker_details['lei']),
+                        'bloomberg': to_string(ticker_details['bloomberg']),
+                        'sic': to_string(ticker_details['sic']),
                         'sector': ticker_details['sector'],
                         'industry': ticker_details['industry'],
                         'country': ticker_details['country'].upper(),
@@ -357,7 +357,7 @@ class PolygonAPIConnector(BaseAPIConnector):
     
             # extract ticker
             if json_response['results'] is None or len(json_response['results']) == 0: ticker = ''
-            else: ticker = str(json_response['results'][0]['ticker'])
+            else: ticker = to_string(json_response['results'][0]['ticker'])
             if not check_ticker(ticker): ticker = ''
             return ticker
 

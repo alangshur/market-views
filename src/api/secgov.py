@@ -1,10 +1,9 @@
 from datetime import timedelta, date
-from typing import Any
 from io import BytesIO
 import requests
 import zipfile
 
-from src.utils.functional.identifiers import check_ticker
+from src.utils.functional.identifiers import check_ticker, to_string
 from src.api.base import BaseAPIConnector
 from src.utils.mindex import MultiIndex
 
@@ -20,7 +19,7 @@ class SECGovAPIConnector(BaseAPIConnector):
 
         """
             Returns a multi-index with the following fields for all 
-            legal ticker types from sec.gov:
+            legal ticker types from SEC EGDAR:
 
             - ticker (index)
             - cik
@@ -54,9 +53,9 @@ class SECGovAPIConnector(BaseAPIConnector):
 
                     # insert ticker
                     multi_index.insert({
-                        'ticker': v['ticker'],
-                        'cik': v['cik_str'],
-                        'name': v['title']
+                        'ticker': to_string(v['ticker']),
+                        'cik': to_string(v['cik_str']),
+                        'name': to_string(v['title'])
                     })
 
                 except Exception:
@@ -126,9 +125,9 @@ class SECGovAPIConnector(BaseAPIConnector):
 
                     # insert ticker
                     multi_index.insert({
-                        'ticker': row[2],
-                        'cusip': row[1],
-                        'name': row[4]
+                        'ticker': to_string(row[2]),
+                        'cusip': to_string(row[1]),
+                        'name': to_string(row[4])
                     })
                     
                 except Exception:

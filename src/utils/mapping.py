@@ -6,19 +6,22 @@ from src.utils.mindex import MultiIndex
 from src.api.polygon import PolygonAPIConnector
 from src.api.raf import RankAndFiledAPIConnector
 from src.api.secgov import SECGovAPIConnector
+from src.api.gleif import GLEIFAPIConnector
 
 
 class MappingModule(BaseModuleWithLogging):
 
     def __init__(self, polygon_connector: PolygonAPIConnector, 
                  raf_connector: RankAndFiledAPIConnector,
-                 sec_gov_connector: SECGovAPIConnector):
+                 sec_gov_connector: SECGovAPIConnector,
+                 gleif_connector: GLEIFAPIConnector):
 
         super().__init__(self.__class__.__name__)
 
         self.polygon_connector = polygon_connector
         self.raf_connector = raf_connector
         self.sec_gov_connector = sec_gov_connector
+        self.gleif_connector = gleif_connector
 
     def build_ticker_mappings(self) -> MultiIndex:
         """
@@ -29,17 +32,20 @@ class MappingModule(BaseModuleWithLogging):
             - name (index)
             - cusip (index)
             - cik (index)
-            - lei (index)
             - figi (index)
             - isin (index)
+            - lei (index)
+            - bloomberg_gid (index)
+            - irs_number (index)
         """
 
         indices = [
             'ticker', 'name', 'cusip', 'cik', 
-            'lei', 'figi', 'isin'
+            'figi', 'isin', 'lei', 'bloomberg_gid', 'irs_number'
         ]
 
         try:
+            self.logger.info('Building ticker mappings.')
         
             # fetch ticker data
             ticker_data = self.polygon_connector.get_internal_tickers()
@@ -69,7 +75,12 @@ class MappingModule(BaseModuleWithLogging):
             # fetch RAF lei data
             raf_lei_data = self.raf_connector.get_leis()
             if raf_lei_data is None:
-                raise Exception('missing RAF lei datat')
+                raise Exception('missing RAF lei data')
+
+            # fetch GLEIF lei data
+            gleif_lei_data = self.gleif_connector.get_leis()
+            if gleif_lei_data is None:
+                raise Exception('missing GEIF lei data')
 
             # build multi-index
             multi_index = MultiIndex(indices, default_index_key='ticker', safe_mode=True)
@@ -91,12 +102,6 @@ class MappingModule(BaseModuleWithLogging):
                     elif nn(ticker_details_data_obj) and nn(ticker_details_data_obj['cik']): cik = ticker_details_data_obj['cik']
                     elif nn(raf_ticker_data_obj): cik = raf_ticker_data_obj['cik']
                     else: cik = None
-                
-                    # get lei
-                    raf_lei_data_obj = raf_lei_data.get('cik', cik)
-                    if nn(ticker_details_data_obj) and nn(ticker_details_data_obj['lei']): lei = ticker_details_data_obj['lei']
-                    elif nn(raf_lei_data_obj): lei = raf_lei_data_obj['lei']
-                    else: lei = None
 
                     # get figi
                     if nn(ticker_data_obj['figi']): figi = ticker_data_obj['figi']
@@ -111,25 +116,51 @@ class MappingModule(BaseModuleWithLogging):
                         isin = country_code + cusip + isin_checksum_digit
                     else:
                         isin = None
-                    
+
+                    # get lei
+                    raf_lei_data_obj = raf_lei_data.get('cik', cik)
+                    gleif_lei_data_obj = gleif_lei_data.get('isin', isin)
+                    if nn(gleif_lei_data_obj): lei = gleif_lei_data_obj['lei']
+                    elif nn(ticker_details_data_obj) and nn(ticker_details_data_obj['lei']): lei = ticker_details_data_obj['lei']
+                    elif nn(raf_lei_data_obj): lei = raf_lei_data_obj['lei']
+                    else: lei = None
+
+                    # get bloomberg global id
+                    if nn(ticker_details_data_obj) and nn(ticker_details_data_obj['bloomberg']): bloomberg_gid = ticker_details_data_obj['bloomberg']
+                    else: bloomberg_gid = None
+
+                    # get IRS number
+                    if nn(raf_ticker_data_obj): irs_number = raf_ticker_data_obj['irs_number']
+                    else: irs_number = None
+
                     # build index
                     ticker_mapping = {}
                     ticker_mapping['ticker'] = ticker
                     ticker_mapping['name'] = name
                     if nn(cusip): ticker_mapping['cusip'] = cusip
                     if nn(cik): ticker_mapping['cik'] = cik
-                    if nn(lei): ticker_mapping['lei'] = lei
                     if nn(figi): ticker_mapping['figi'] = figi
                     if nn(isin): ticker_mapping['isin'] = isin
+                    if nn(lei): ticker_mapping['lei'] = lei
+                    if nn(bloomberg_gid): ticker_mapping['bloomberg_gid'] = bloomberg_gid
+                    if nn(irs_number): ticker_mapping['irs_number'] = irs_number
+
+                    # insert ticker details
+                    ticker_mapping['locale'] = ticker_data_obj['locale']
+                    ticker_mapping['asset_class'] = ticker_data_obj['asset_class']
+                    ticker_mapping['currency_code'] = ticker_data_obj['currency_code']
+                    ticker_mapping['last_updated'] = ticker_data_obj['last_updated']
+
+
+                    
                     multi_index.insert(ticker_mapping)
                     
-                except Exception as e:
-                    print(e)
+                except Exception:
+                    continue
 
             return multi_index
 
         except Exception as e:
-            print(cusip)
             self.logger.exception('Error in build_ticker_mappings: ' + str(e))
             return None
 

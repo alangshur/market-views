@@ -10,7 +10,14 @@ def remove_lowercase(string: str) -> str:
 
 
 def nn(value: Any) -> bool:
-    return value is not None
+    if value == '': return False
+    elif value == 'None': return False
+    else: return value is not None
+
+
+def to_string(value: Any) -> str:
+    if value is None: return None
+    else: return str(value)
 
 
 def convert_letters_to_string_numbers(string: str) -> str:
@@ -42,13 +49,15 @@ def validate_ticker(ticker: str) -> str:
     return ticker
 
 
-def get_mapping_identifier_stats(mapping_index: MultiIndex) -> dict:
+def print_mapping_identifier_stats(mapping_index: MultiIndex) -> None:
     count_dict = {
         'no_ciks': 0,
         'no_cusips': 0,
         'no_lei': 0,
         'no_figi': 0,
-        'no_isin': 0
+        'no_isin': 0,
+        'no_bloomberg': 0,
+        'no_irs': 0
     }
     
     for obj in mapping_index:
@@ -57,10 +66,14 @@ def get_mapping_identifier_stats(mapping_index: MultiIndex) -> dict:
         if 'lei' not in obj: count_dict['no_lei'] += 1
         if 'figi' not in obj: count_dict['no_figi'] += 1
         if 'isin' not in obj: count_dict['no_isin'] += 1
+        if 'bloomberg_gid' not in obj: count_dict['no_bloomberg'] += 1
+        if 'irs_number' not in obj: count_dict['no_irs'] += 1
     
-    count_dict['no_ciks'] = count_dict['no_ciks'] / len(mapping_index)
-    count_dict['no_cusips'] = count_dict['no_cusips'] / len(mapping_index)
-    count_dict['no_lei'] = count_dict['no_lei'] / len(mapping_index)
-    count_dict['no_figi'] = count_dict['no_figi'] / len(mapping_index)
-    count_dict['no_isin'] = count_dict['no_isin'] / len(mapping_index)
-    return count_dict
+    print('Total tickers: {}'.format(len(mapping_index)))
+    print('No CIK: {}%'.format(round(count_dict['no_ciks'] / len(mapping_index) * 100, 2)))
+    print('No CUSIP: {}%'.format(round(count_dict['no_cusips'] / len(mapping_index) * 100, 2)))
+    print('No LEI: {}%'.format(round(count_dict['no_lei'] / len(mapping_index) * 100, 2)))
+    print('No FIGI: {}%'.format(round(count_dict['no_figi'] / len(mapping_index) * 100, 2)))
+    print('No ISIN: {}%'.format(round(count_dict['no_isin'] / len(mapping_index) * 100, 2)))
+    print('No Bloomberg GID: {}%'.format(round(count_dict['no_bloomberg'] / len(mapping_index) * 100, 2)))
+    print('No IRS Number: {}%'.format(round(count_dict['no_irs'] / len(mapping_index) * 100, 2)))

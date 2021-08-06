@@ -1,7 +1,7 @@
 from datetime import timedelta
 import requests
 
-from src.utils.functional.identifiers import check_ticker
+from src.utils.functional.identifiers import check_ticker, to_string
 from src.api.base import BaseAPIConnector
 from src.utils.mindex import MultiIndex
 
@@ -66,14 +66,14 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
                     elif exchange.startswith('OTC'): continue
                     else:
                         multi_index.insert({
-                            'cik': row[0],
-                            'ticker': row[1],
-                            'name': row[2],
-                            'exchange': row[3],
-                            'sic': row[4],
-                            'headquartered_in': row[5],
-                            'incorporated_in': row[6],
-                            'irs_number': row[7],
+                            'cik': to_string(row[0]),
+                            'ticker': to_string(row[1]),
+                            'name': to_string(row[2]),
+                            'exchange': to_string(row[3]),
+                            'sic': to_string(row[4]),
+                            'headquartered_in': to_string(row[5]),
+                            'incorporated_in': to_string(row[6]),
+                            'irs_number': to_string(row[7]),
                         })
 
                 except Exception:
@@ -134,10 +134,10 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
                     if len(sic) == 0: continue
                     else:
                         multi_index.insert({
-                            'sic': row[0],
-                            'sic_classification': row[1],
-                            'naics': row[2],
-                            'naics_classification': row[3]
+                            'sic': to_string(row[0]),
+                            'sic_classification': to_string(row[1]),
+                            'naics': to_string(row[2]),
+                            'naics_classification': to_string(row[3])
                         })
 
                 except Exception:
@@ -204,10 +204,10 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
                     elif len(cusip) == 0: continue
                     else:
                         multi_index.insert({
-                            'cik': row[3],
-                            'ticker': row[1],
-                            'issuer': row[0],
-                            'cusip': row[2]
+                            'cik': to_string(row[3]),
+                            'ticker': to_string(row[1]),
+                            'issuer': to_string(row[0]),
+                            'cusip': to_string(row[2])
                         })
 
                 except Exception:
@@ -272,10 +272,10 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
                     elif len(lei) == 0: continue
                     else:
                         multi_index.insert({
-                            'cik': row[0],
-                            'name': row[1],
-                            'lei': row[2],
-                            'legal_form': row[3]
+                            'cik': to_string(row[0]),
+                            'name': to_string(row[1]),
+                            'lei': to_string(row[2]),
+                            'legal_form': to_string(row[3])
                         })
 
                 except Exception:

@@ -43,6 +43,7 @@ class MultiIndex(object):
     def __next__(self) -> dict:
         objs = self.get_all()
         if self.iteration >= len(objs):
+            self.reset()
             raise StopIteration
         else:
             obj = objs[self.iteration]
@@ -76,7 +77,7 @@ class MultiIndex(object):
             if k in index_keys_copy: 
                 index_keys_copy.remove(k)
                 if v in self.index_tables[k]:
-                    raise Exception('collision on index key; \"{}:{}\"'.format(k, v))
+                    raise Exception('collision on index key: \"{}:{}\"'.format(k, v))
         if not self.safe_mode and len(index_keys_copy) > 0:
             raise Exception('not all index keys specified')
         elif self.safe_mode and self.default_index_key in index_keys_copy:
@@ -93,11 +94,13 @@ class MultiIndex(object):
         self.hash_table[hash_key] = obj
     
     def get(self, key: str, value: Any) -> dict:
-        if key not in self.index_keys:
+        if value is None:
+            return None
+        elif key not in self.index_keys:
             raise Exception('invalid index key; {}'.format(key))
         elif value not in self.index_tables[key]:
             if self.safe_mode: return None
-            else: raise Exception('index key value not found; \"{}:{}\"'.format(key, value))
+            else: raise Exception('index key value not found: \"{}:{}\"'.format(key, value))
         else:
             hash_key = self.lookup_tables[key][value]
             return self.hash_table[hash_key]
@@ -107,7 +110,7 @@ class MultiIndex(object):
         # get object
         obj = self.get(key, value)
         if obj is None:
-            raise Exception('index key value not found; \"{}:{}\"'.format(key, value))
+            raise Exception('index key value not found: \"{}:{}\"'.format(key, value))
 
         # remove object indices
         hash_key = None
