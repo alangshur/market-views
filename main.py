@@ -1,6 +1,7 @@
 from src.utils.functional.identifiers import print_mapping_identifier_stats
 from src.data.sec13f import SEC13FDataLoader
 from src.storage.s3 import S3StorageConnector
+from src.storage.redis import RedisStorageConnector
 from src.mem.ticker import TickerMemLoader
 from src.api.polygon import PolygonAPIConnector
 from src.api.raf import RankAndFiledAPIConnector
@@ -31,14 +32,16 @@ from src.api.gleif import GLEIFAPIConnector
 # print(monitor_metrics)
 
 
+redis_connector = RedisStorageConnector(credentials_file_path='config/redis.json')
+
 polygon_connector = PolygonAPIConnector(credentials_file_path='config/polygon.json')
 raf_connector = RankAndFiledAPIConnector(credentials_file_path='config/raf.json')
 sec_gov_connector = SECGovAPIConnector(credentials_file_path='config/secgov.json')
 gleif_connector = GLEIFAPIConnector(credentials_file_path='config/gleif.json')
 
-ticker_mem_loader = TickerMemLoader(polygon_connector, raf_connector, sec_gov_connector, gleif_connector)
-multi_index = ticker_mem_loader.update()
-print_mapping_identifier_stats(multi_index)
+ticker_mem_loader = TickerMemLoader(redis_connector, polygon_connector, raf_connector, sec_gov_connector, gleif_connector)
+ticker_mem_loader.update()
+
 
 # TODO: 
 # - add last quote API (mem loader)

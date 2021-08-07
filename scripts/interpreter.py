@@ -1,4 +1,10 @@
+from pathlib import Path
 import cachelib
+import sys
+
+path_prefix = str(Path(__file__).parent.absolute())
+path_prefix += '/..'
+sys.path.insert(0, path_prefix)
 
 from src.api.polygon import PolygonAPIConnector
 from src.api.raf import RankAndFiledAPIConnector

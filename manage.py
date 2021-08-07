@@ -1,15 +1,14 @@
 import os
-import time
 import argparse
 import pathlib
 import sys
 
 
 # define arguments
-parser = argparse.ArgumentParser(description='Utility for starting and stopping redis service.')
-parser.add_argument('--start', action='store_true', help='Start redis service.')
-parser.add_argument('--stop', action='store_true', help='Stop any existing redis service.')
-parser.add_argument('--clean', action='store_true', help='Clean redis logs.')
+parser = argparse.ArgumentParser(description='Utility for starting and stopping background services.')
+parser.add_argument('--start', action='store_true', help='Start all background services.')
+parser.add_argument('--stop', action='store_true', help='Stop any existing background services.')
+parser.add_argument('--clean', action='store_true', help='Clean background service logs and storage dumps.')
 
 # parse arguments
 args = parser.parse_args() 

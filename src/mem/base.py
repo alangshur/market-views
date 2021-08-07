@@ -16,4 +16,5 @@ class BaseMemLoaderModule(BaseModuleWithLogging):
         raise NotImplemented
 
     def _save_data(self, data_name: str, data: Any) -> bool:
-        return self.redis_connector.set(data_name, data)
+        try: return self.redis_connector.set(data_name, data)
+        except Exception: return False
