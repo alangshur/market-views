@@ -3,19 +3,24 @@ import boto3
 import json
 import io
 
-from src.aws.base import BaseAWSConnector
+from src.storage.base import BaseStorageConnector
 
 
-class AWSS3Connector(BaseAWSConnector):
+class S3StorageConnector(BaseStorageConnector):
 
     def __init__(self, credentials_file_path: str):
         super().__init__(self.__class__.__name__, credentials_file_path)
 
+        # get AWS credentials
+        access_key_id = self.storage_credentials['access_key_id']
+        secret_access_key = self.storage_credentials['secret_access_key']
+        region_name = self.storage_credentials['region_name']
+
         # connect to s3
         self.s3_resource = boto3.resource('s3', 
-            aws_access_key_id=self.access_key_id,
-            aws_secret_access_key=self.secret_access_key,
-            region_name=self.region_name
+            aws_access_key_id=access_key_id,
+            aws_secret_access_key=secret_access_key,
+            region_name=region_name
         )
 
     def read_json(self, bucket_name: str, object_name: str) -> dict:

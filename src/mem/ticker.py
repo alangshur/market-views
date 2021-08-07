@@ -24,7 +24,7 @@ class TickerMemLoader(BaseMemLoaderModule):
         self.sec_gov_connector = sec_gov_connector
         self.gleif_connector = gleif_connector
 
-    def update(self) -> MultiIndex:
+    def update(self) -> bool:
         try:
             self.logger.info('Starting update routine.')
         
@@ -74,6 +74,7 @@ class TickerMemLoader(BaseMemLoaderModule):
                 raise Exception('missing industry data')
 
             # build multi-index
+            self.logger.info('Building ticker mapping.')
             indices = ['ticker', 'name', 'cusip', 'cik', 'figi', 'isin', 'lei', 'bloomberg_gid', 'irs_number']
             multi_index = MultiIndex(indices, default_index_key='ticker', safe_mode=True)
             for ticker_data_obj in ticker_data:
@@ -176,8 +177,16 @@ class TickerMemLoader(BaseMemLoaderModule):
                 except MultiIndexException:
                     continue
 
+            # save ticker data
+            self.logger.info('Saving new ticker data.')
+            save_result = self._save_data('tickers', ticker_mapping)
+            if not save_result:
+                self.logger.error('Failed to save ticker data.')
+                return False
+
             self.logger.info('Finishing update routine.')
+            return True
 
         except Exception as e:
-            self.logger.exception('Error in build_ticker_mappings: ' + str(e))
-            return None
+            self.logger.exception('Error in update: ' + str(e))
+            return False

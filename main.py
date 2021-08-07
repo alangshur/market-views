@@ -1,6 +1,6 @@
 from src.utils.functional.identifiers import print_mapping_identifier_stats
 from src.data.sec13f import SEC13FDataLoader
-from src.aws.s3 import AWSS3Connector
+from src.storage.s3 import S3StorageConnector
 from src.mem.ticker import TickerMemLoader
 from src.api.polygon import PolygonAPIConnector
 from src.api.raf import RankAndFiledAPIConnector
@@ -9,7 +9,7 @@ from src.api.secgov import SECGovAPIConnector
 from src.api.gleif import GLEIFAPIConnector
 
 
-# s3_connector = AWSS3Connector(credentials_file_path='config/aws.json')
+# s3_connector = S3StorageConnector(credentials_file_path='config/aws.json')
 # sec_connector = SECAPIConnector(credentials_file_path='config/sec.json')
 # polygon_connector = PolygonAPIConnector(credentials_file_path='config/polygon.json')
 
