@@ -1,7 +1,7 @@
 from src.utils.functional.identifiers import print_mapping_identifier_stats
-from src.raw.sec13f import SEC13FLoader
+from src.data.sec13f import SEC13FDataLoader
 from src.aws.s3 import AWSS3Connector
-from src.utils.mapping import MappingModule
+from src.mem.ticker import TickerMemLoader
 from src.api.polygon import PolygonAPIConnector
 from src.api.raf import RankAndFiledAPIConnector
 from src.api.sec import SECAPIConnector
@@ -14,7 +14,7 @@ from src.api.gleif import GLEIFAPIConnector
 # polygon_connector = PolygonAPIConnector(credentials_file_path='config/polygon.json')
 
 
-# sec_13f_loader = SEC13FLoader(
+# sec_13f_loader = SEC13FDataLoader(
 #     s3_connector=s3_connector, 
 #     polygon_connector=polygon_connector,
 #     sec_connector=sec_connector,
@@ -36,6 +36,13 @@ raf_connector = RankAndFiledAPIConnector(credentials_file_path='config/raf.json'
 sec_gov_connector = SECGovAPIConnector(credentials_file_path='config/secgov.json')
 gleif_connector = GLEIFAPIConnector(credentials_file_path='config/gleif.json')
 
-mapping_module = MappingModule(polygon_connector, raf_connector, sec_gov_connector, gleif_connector)
-multi_index = mapping_module.build_ticker_mappings()
+ticker_mem_loader = TickerMemLoader(polygon_connector, raf_connector, sec_gov_connector, gleif_connector)
+multi_index = ticker_mem_loader.update()
 print_mapping_identifier_stats(multi_index)
+
+# TODO: 
+# - add last quote API (mem loader)
+# - add historical data API (data loader)
+# - add historical splits (mem loader)
+# - add historical dividends (mem loader)
+# - add current dividend data to ticker mapping

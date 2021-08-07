@@ -3,23 +3,20 @@ from dateutil import parser
 import time
 
 from src.aws.s3 import AWSS3Connector
-from src.api.polygon import PolygonAPIConnector
 from src.api.sec import SECAPIConnector
-from src.raw.base import BaseLoaderModule
+from src.data.base import BaseDataLoaderModule
 
 
-class SEC13FLoader(BaseLoaderModule):
-    
-    def __init__(self, s3_connector: AWSS3Connector, polygon_connector: PolygonAPIConnector, 
-                 sec_connector: SECAPIConnector, manifest_s3_bucket_name: str,
-                 manifest_s3_object_name: str, data_s3_bucket_name: str, 
+class SEC4DataLoader(BaseDataLoaderModule):
+
+    def __init__(self, s3_connector: AWSS3Connector, sec_connector: SECAPIConnector, 
+                 manifest_s3_bucket_name: str, manifest_s3_object_name: str, data_s3_bucket_name: str, 
                  delay_time_secs: int=0,
                  fetch_from_override_dt: datetime=None):
 
         super().__init__(self.__class__.__name__, s3_connector, manifest_s3_bucket_name,
                          manifest_s3_object_name, data_s3_bucket_name)
 
-        self.polygon_connector = polygon_connector
         self.sec_connector = sec_connector
         self.delay_time_secs = delay_time_secs
         self.fetch_from_override_dt = fetch_from_override_dt
@@ -56,9 +53,8 @@ class SEC13FLoader(BaseLoaderModule):
                 self.logger.info('Loading filings: {}.'.format(fetch_from_dt.date()))
 
                 # query SEC API
-                query_result = self.sec_connector.query_13f_filings(
-                    fetch_from_dt=fetch_from_dt,
-                    polygon_connector=self.polygon_connector
+                query_result = self.sec_connector.query_form_4_filings(
+                    fetch_from_dt=fetch_from_dt
                 )
 
                 # verify result
@@ -79,13 +75,13 @@ class SEC13FLoader(BaseLoaderModule):
                     self.logger.error('Failed to save manifest.')
                     return False
 
-                # save 13f data
+                # save form 4 data
                 self.logger.info('Saving new filings data.')
                 for filing in filings:
                     id = filing['id']
-                    cik = filing['cik']
+                    ticker = filing['issuer']['ticker']
                     date = filing['report_period']
-                    save_result = self._save_data(cik, date, filing)
+                    save_result = self._save_data(ticker, date, filing)
                     if not save_result:
                         self.logger.error('Failed to save filing {}.'.format(id))
                         return False
@@ -98,9 +94,9 @@ class SEC13FLoader(BaseLoaderModule):
             self._replace_monitor_metric('update_time_secs', stop_time - start_time)
             self._replace_monitor_metric('query_iterations', query_iteration)
             self._replace_monitor_metric('filings_added', total_filings)
-            self.logger.info('Stopping update routine.')
+            self.logger.info('Finishing update routine.')
             return True
-
+        
         except Exception as e:
             self.logger.exception('Error in update: ' + str(e))
             return False

@@ -4,7 +4,7 @@ from src.aws.s3 import AWSS3Connector
 from src.utils.logger import BaseModuleWithLogging
 
 
-class BaseLoaderModule(BaseModuleWithLogging):
+class BaseDataLoaderModule(BaseModuleWithLogging):
 
     def __init__(self, name: str, s3_connector: AWSS3Connector, 
                  manifest_s3_bucket_name: str, manifest_s3_object_name: str,

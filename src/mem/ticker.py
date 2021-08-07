@@ -7,9 +7,10 @@ from src.api.polygon import PolygonAPIConnector
 from src.api.raf import RankAndFiledAPIConnector
 from src.api.secgov import SECGovAPIConnector
 from src.api.gleif import GLEIFAPIConnector
+from src.mem.base import BaseMemLoaderModule
 
 
-class MappingModule(BaseModuleWithLogging):
+class TickerMemLoader(BaseMemLoaderModule):
 
     def __init__(self, polygon_connector: PolygonAPIConnector, 
                  raf_connector: RankAndFiledAPIConnector,
@@ -23,29 +24,9 @@ class MappingModule(BaseModuleWithLogging):
         self.sec_gov_connector = sec_gov_connector
         self.gleif_connector = gleif_connector
 
-    def build_ticker_mappings(self) -> MultiIndex:
-        """
-            Returns a multi-index with the following fields for all 
-            internal ticker types:
-
-            - ticker (index)
-            - name (index)
-            - cusip (index)
-            - cik (index)
-            - figi (index)
-            - isin (index)
-            - lei (index)
-            - bloomberg_gid (index)
-            - irs_number (index)
-        """
-
-        indices = [
-            'ticker', 'name', 'cusip', 'cik', 
-            'figi', 'isin', 'lei', 'bloomberg_gid', 'irs_number'
-        ]
-
+    def update(self) -> MultiIndex:
         try:
-            self.logger.info('Building ticker mappings.')
+            self.logger.info('Starting update routine.')
         
             # fetch ticker data
             ticker_data = self.polygon_connector.get_internal_tickers()
@@ -93,6 +74,7 @@ class MappingModule(BaseModuleWithLogging):
                 raise Exception('missing industry data')
 
             # build multi-index
+            indices = ['ticker', 'name', 'cusip', 'cik', 'figi', 'isin', 'lei', 'bloomberg_gid', 'irs_number']
             multi_index = MultiIndex(indices, default_index_key='ticker', safe_mode=True)
             for ticker_data_obj in ticker_data:
                 try:
@@ -194,15 +176,8 @@ class MappingModule(BaseModuleWithLogging):
                 except MultiIndexException:
                     continue
 
-            return multi_index
+            self.logger.info('Finishing update routine.')
 
         except Exception as e:
             self.logger.exception('Error in build_ticker_mappings: ' + str(e))
             return None
-
-
-    def build_exchange_mappings(self) -> dict:
-        raise NotImplementedError
-
-    def build_locale_mappings(self) -> dict:
-        raise NotImplementedError
