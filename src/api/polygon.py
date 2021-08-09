@@ -5,7 +5,7 @@ from tqdm import tqdm
 import requests
 import time
 
-from src.utils.functional.identifiers import check_ticker, to_string
+from src.utils.functional.identifiers import check_ticker, to_string, parse_cik
 from src.utils.mindex import MultiIndex
 from src.api.base import BaseAPIConnector
 
@@ -41,7 +41,7 @@ class PolygonAPIConnector(BaseAPIConnector):
     
     def get_stock_splits(self, ticker: str) -> list:
         try:
-            assert(len(ticker) > 0)
+            assert(len(ticker) > 0, 'no tickers specified')
             result = self._query_endpoint(
                 endpoint_name='splits/' + ticker,    
                 alt_domain=self.api_credentials['api-domain-v2']
@@ -51,12 +51,12 @@ class PolygonAPIConnector(BaseAPIConnector):
             else: return None
 
         except Exception as e:
-            self.logger.exception('Error in get_ticker_types: ' + str(e))
+            self.logger.exception('Error in get_stock_splits: ' + str(e))
             return None
 
     def get_stock_dividends(self, ticker: str) -> list:
         try:
-            assert(len(ticker) > 0)
+            assert(len(ticker) > 0, 'no tickers specified')
             result = self._query_endpoint(
                 endpoint_name='dividends/' + ticker,    
                 alt_domain=self.api_credentials['api-domain-v2']
@@ -66,7 +66,7 @@ class PolygonAPIConnector(BaseAPIConnector):
             else: return None
 
         except Exception as e:
-            self.logger.exception('Error in get_ticker_types: ' + str(e))
+            self.logger.exception('Error in get_stock_dividends: ' + str(e))
             return None
 
     def get_ticker_types(self) -> dict:
@@ -115,6 +115,7 @@ class PolygonAPIConnector(BaseAPIConnector):
         """
         
         try:
+            self.logger.info('Loading get_internal_exchanges from cloud.')
             exchanges_data = self._query_endpoint(
                 endpoint_name='exchanges',    
                 alt_domain=self.api_credentials['api-domain-meta'],
@@ -139,7 +140,7 @@ class PolygonAPIConnector(BaseAPIConnector):
             return multi_index
 
         except Exception as e:
-            self.logger.exception('Error in get_exchanges: ' + str(e))
+            self.logger.exception('Error in get_internal_exchanges: ' + str(e))
             return None
     
     def get_internal_tickers(self,
@@ -163,6 +164,7 @@ class PolygonAPIConnector(BaseAPIConnector):
             tickers_data = []
 
             # send initial request
+            self.logger.info('Loading get_internal_tickers from cloud.')
             response = requests.get(
                 url=self.api_domain + 'tickers', 
                 params={
@@ -177,9 +179,9 @@ class PolygonAPIConnector(BaseAPIConnector):
             # verify response
             response.raise_for_status()
             json_response = response.json()
-            assert(json_response['status'] == 'OK')
-            assert(json_response['count'] > 0)
-            assert(len(json_response['next_url']) > 0)
+            assert(json_response['status'] == 'OK', 'bad response status')
+            assert(json_response['count'] > 0, 'no data in response')
+            assert(len(json_response['next_url']) > 0, 'no next_url in response')
             tickers_data.extend(json_response['results'])
             next_url = json_response['next_url']
 
@@ -198,8 +200,8 @@ class PolygonAPIConnector(BaseAPIConnector):
                 # verify response
                 response.raise_for_status()
                 json_response = response.json()
-                assert(json_response['status'] == 'OK')
-                assert(json_response['count'] > 0)
+                assert(json_response['status'] == 'OK', 'bad response status')
+                assert(json_response['count'] > 0, 'no data in response')
                 tickers_data.extend(json_response['results'])
 
                 # check next url
@@ -241,6 +243,72 @@ class PolygonAPIConnector(BaseAPIConnector):
             self.logger.exception('Error in get_internal_tickers: ' + str(e))
             return None
     
+    def get_internal_ticker_quotes(self,
+                                   no_cache: bool=False,
+                                   cache_expiry_delta: timedelta=timedelta(days=30),
+                                   progress_bar: bool=False) -> MultiIndex:
+
+        """
+            Returns a multi-index with the following fields for all 
+            internal tickers:
+
+            - ticker (index)
+        """
+
+        try: 
+
+            # get internal tickers
+            internal_tickers = self.get_internal_tickers()
+            internal_tickers = internal_tickers.get_all_key_values('ticker')
+            internal_tickers_str = ','.join(internal_tickers)
+
+            # query ticker quotes
+            self.logger.info('Loading get_internal_ticker_quotes from cloud.')
+            response = requests.get(
+                url=self.api_credentials['api-domain-snapshot'] + 'tickers', 
+                params={
+                    'apiKey': self.api_key,
+                    'tickers': internal_tickers_str
+                }
+            )
+
+            # verify response
+            response.raise_for_status()
+            json_response = response.json()
+            assert(json_response['status'] == 'DELAYED', 'bad response status')
+            
+            # check cache if empty response
+            if len(json_response['count']) == 0 and not no_cache:
+                cached_item = self._get_cache('get_internal_ticker_quotes', 'all')
+                if cached_item is not None: 
+                    self.logger.info('Loading get_internal_ticker_quotes from cache.')
+                    return cached_item
+                else:
+                    raise Exception('no data in response')
+            elif len(json_response['count']) == 0:
+                raise Exception('no data in response')
+            elif len(json_response['count']) != len(internal_tickers):
+                raise Exception('missing data in response')
+
+            # get ticker quotes data
+            indices = ['ticker']
+            multi_index = MultiIndex(indices, default_index_key='ticker', safe_mode=True)
+            for ticker in json_response['tickers']:
+
+                # TODO: implement ticker quotes
+                pass
+
+            # cache item
+            if not no_cache:
+                self._add_cache('get_internal_ticker_quotes', 'all', multi_index, 
+                                expiry_delta=cache_expiry_delta)
+
+            return multi_index
+            
+        except Exception as e:
+            self.logger.exception('Error in get_internal_ticker_quotes: ' + str(e))
+            return None
+
     def get_internal_ticker_details(self,
                                     no_cache: bool=False,
                                     cache_expiry_delta: timedelta=timedelta(days=30),
@@ -285,7 +353,7 @@ class PolygonAPIConnector(BaseAPIConnector):
             internal_tickers = internal_tickers.get_all_key_values('ticker')
                 
             # get ticker details data
-            self.logger.info('Loading get_internal_ticker_details from internet.')
+            self.logger.info('Loading get_internal_ticker_details from cloud.')
             indices = ['ticker']
             multi_index = MultiIndex(indices, default_index_key='ticker', safe_mode=True)
             for ticker in tqdm(internal_tickers, disable=not progress_bar):
@@ -302,7 +370,7 @@ class PolygonAPIConnector(BaseAPIConnector):
                     multi_index.insert({
                         'ticker': to_string(ticker_details['symbol']),
                         'name': to_string(ticker_details['name']),
-                        'cik': to_string(ticker_details['cik']),
+                        'cik': parse_cik(to_string(ticker_details['cik'])),
                         'figi': to_string(ticker_details['figi']),
                         'lei': to_string(ticker_details['lei']),
                         'bloomberg': to_string(ticker_details['bloomberg']),
@@ -333,6 +401,82 @@ class PolygonAPIConnector(BaseAPIConnector):
             
         except Exception as e:
             self.logger.exception('Error in get_internal_ticker_details: ' + str(e))
+            return None
+
+    def get_internal_ticker_dividends(self, 
+                                      no_cache: bool=False,
+                                      cache_expiry_delta: timedelta=timedelta(days=30),
+                                      progress_bar: bool=False) -> MultiIndex:
+
+        """
+            Returns a multi-index with the following fields for all 
+            internal tickers:
+
+            - ticker (index)
+        """
+
+        try: 
+
+            # check cache
+            if not no_cache:
+                cached_item = self._get_cache('get_internal_ticker_dividends', 'all')
+                if cached_item is not None: 
+                    self.logger.info('Loading get_internal_ticker_dividends from cache.')
+                    return cached_item
+
+            # get internal tickers
+            internal_tickers = self.get_internal_tickers()
+            internal_tickers = internal_tickers.get_all_key_values('ticker')
+                
+            # get ticker details data
+            self.logger.info('Loading get_internal_ticker_dividends from cloud.')
+            indices = ['ticker']
+            multi_index = MultiIndex(indices, default_index_key='ticker', safe_mode=True)
+            for ticker in tqdm(internal_tickers, disable=not progress_bar):
+                try:
+
+                    # query ticker details
+                    ticker_dividends = self._query_endpoint(
+                        endpoint_name='dividends/{}'.format(ticker),    
+                        alt_domain=self.api_credentials['api-domain-v2']
+                    )
+                    
+                    # get last year dividends
+                    idx = 0
+                    annual_dividends = []
+                    cur_dividend_date = ticker_dividends[idx]['paymentDate']
+                    cur_dividend_date = parser.parse(cur_dividend_date).date()
+                    start_dividend_date = cur_dividend_date - timedelta(days=400)
+                    while cur_dividend_date > start_dividend_date:
+                        annual_dividends.append(ticker_dividends[idx]['amount'])
+                        idx += 1
+                        cur_dividend_date = ticker_dividends[idx]['paymentDate']
+                        cur_dividend_date = parser.parse(cur_dividend_date).date()
+
+                    # get dividend yield
+                    if len(annual_dividends) > 6:
+                        annual_dividends = annual_dividends[:12]
+                        rolling_annual_dividend = sum(annual_dividends)
+                        annual_dividend = annual_dividends[0] * 12
+                    else:
+                        annual_dividends = annual_dividends[:4]
+                        rolling_annual_dividend = sum(annual_dividends)
+                        annual_dividend = annual_dividends[0] * 4
+
+                    # TODO: calculate dividend yield and all stats
+
+                except Exception:
+                    pass
+                
+            # cache item
+            if not no_cache:
+                self._add_cache('get_internal_ticker_dividends', 'all', multi_index, 
+                                expiry_delta=cache_expiry_delta)
+
+            return multi_index
+            
+        except Exception as e:
+            self.logger.exception('Error in get_internal_ticker_dividends: ' + str(e))
             return None
 
     def query_ticker_with_cusip(self, cusip: str) -> str:
@@ -375,7 +519,7 @@ class PolygonAPIConnector(BaseAPIConnector):
             # verify response
             response.raise_for_status()
             json_response = response.json()
-            assert(json_response['status'] == 'OK')
+            assert(json_response['status'] == 'OK', 'bad response status')
             return json_response
 
         except Exception:
@@ -383,21 +527,27 @@ class PolygonAPIConnector(BaseAPIConnector):
 
     def _query_endpoint(self, endpoint_name: str,
                         alt_domain: str=None,
-                        check_ok: bool=True) -> Any: 
+                        check_ok: bool=True,
+                        additional_params: dict={},
+                        delayed_status=False) -> Any: 
 
         # send no-param request
         if alt_domain is None: domain = self.api_domain
         else: domain = alt_domain
         response = requests.get(
             url=domain + endpoint_name, 
-            params={'apiKey': self.api_key}
+            params={
+                'apiKey': self.api_key,
+                **additional_params
+            }
         )
 
         # verify response
         response.raise_for_status()
         json_response = response.json()
         if check_ok:
-            assert(json_response['status'] == 'OK')
+            if delayed_status: assert(json_response['status'] == 'DELAYED', 'bad response status')
+            else: assert(json_response['status'] == 'OK', 'bad response status')
             return json_response['results']
         else:
             return json_response

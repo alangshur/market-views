@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-from threading import Condition
 from requests_html import HTMLSession
 from typing import Tuple, Callable, Any
 from bs4 import BeautifulSoup, Tag
@@ -9,8 +8,9 @@ import requests
 import uuid
 import time
 
+from src.utils.functional.identifiers import to_string, parse_cik
+from src.utils.mindex import MultiIndex
 from src.api.base import BaseAPIConnector
-from src.api.polygon import PolygonAPIConnector
 
 
 class SECAPIConnector(BaseAPIConnector):
@@ -18,8 +18,8 @@ class SECAPIConnector(BaseAPIConnector):
     def __init__(self, credentials_file_path: str):
         super().__init__(self.__class__.__name__, credentials_file_path)
         
-    def query_13f_filings(self, fetch_from_dt: datetime,
-                          polygon_connector: PolygonAPIConnector,
+    def query_13f_filings(self, fetch_from_dt: datetime, tickers: MultiIndex,
+                          ciks: MultiIndex,
                           progress_bar: bool=True) -> Tuple[list, datetime]:
 
         try:
@@ -63,25 +63,30 @@ class SECAPIConnector(BaseAPIConnector):
             cleaned_filings = []
             for filing in tqdm(json_response['filings'], disable=not progress_bar):
 
-                # skip missing holdings
+                # skip invalid filings
                 if 'holdings' not in filing or 'periodOfReport' not in filing:
                     continue
+
+                # verify ciks
 
                 # clean holdings data
                 cleaned_holdings = []
                 for holding in filing['holdings']:
+
+                    # validate cusip
                     cusip = str(holding['cusip']).upper()
                     if len(cusip) != 9: 
                         self.logger.error('Bad CUSIP encountered: {}.'.format(cusip))
                         continue
 
                     # query ticker from cusip
-                    ticker = polygon_connector.query_ticker_with_cusip(cusip)
-                    if ticker is None: ticker = ''
+                    ticker_data = tickers.get('cusip', cusip)
+                    if ticker_data is None: continue
+                    else: ticker = ticker_data['ticker']
 
+                    # insert holding
                     cleaned_holdings.append({
                         'issuer_name': holding['nameOfIssuer'],
-                        'cusip': cusip,
                         'ticker': ticker,
                         'value': float(holding['value']),
                         'shares': int(float(holding['shrsOrPrnAmt']['sshPrnamt']))
@@ -89,14 +94,14 @@ class SECAPIConnector(BaseAPIConnector):
 
                 # validate metadata fields
                 if not self._validate_date(filing['periodOfReport']): continue
-                elif len(filing['cik']) == 0: return None
+                elif len(to_string(filing['cik'])) == 0: return None
 
                 # clean filing data
                 cleaned_filings.append({
                     'id': str(uuid.uuid4().hex),
                     'accession_number': filing['accessionNo'],
-                    'cik': filing['cik'],
-                    'ticker': filing['ticker'],
+                    'cik': parse_cik(to_string(filing['cik'])),
+                    'ticker': to_string(filing['ticker']),
                     'company_name': filing['companyName'],
                     'company_name_long': filing['companyNameLong'],
                     'form_type': filing['formType'],
@@ -207,9 +212,9 @@ class SECAPIConnector(BaseAPIConnector):
         # get issuer data
         form_data['issuer'] = {}
         issuer_information = content.find('issuer')
-        form_data['issuer']['cik'] = issuer_information.find('issuercik').get_text()
-        form_data['issuer']['ticker'] = issuer_information.find('issuertradingsymbol').get_text()
-        form_data['issuer']['name'] = issuer_information.find('issuername').get_text()
+        form_data['issuer']['cik'] = parse_cik(to_string(issuer_information.find('issuercik').get_text()))
+        form_data['issuer']['ticker'] = to_string(issuer_information.find('issuertradingsymbol').get_text())
+        form_data['issuer']['name'] = to_string(issuer_information.find('issuername').get_text())
 
         # validate metadata fields
         if not self._validate_date(form_data['report_period']): return None
@@ -218,8 +223,8 @@ class SECAPIConnector(BaseAPIConnector):
         # get reporting owner data
         form_data['reporting_owner'] = {}
         reporting_owner_information = content.find('reportingowner')
-        form_data['reporting_owner']['cik'] = reporting_owner_information.find('rptownercik').get_text()
-        form_data['reporting_owner']['name'] = reporting_owner_information.find('rptownername').get_text()
+        form_data['reporting_owner']['cik'] = parse_cik(to_string(reporting_owner_information.find('rptownercik').get_text()))
+        form_data['reporting_owner']['name'] = to_string(reporting_owner_information.find('rptownername').get_text())
         form_data['reporting_owner']['is_director'] = self._validate_tag_value(reporting_owner_information, 'isdirector', self._parse_bool, False) 
         form_data['reporting_owner']['is_officer'] = self._validate_tag_value(reporting_owner_information, 'isofficer', self._parse_bool, False) 
         form_data['reporting_owner']['is_ten_percent_owner'] = self._validate_tag_value(reporting_owner_information, 'istenpercentowner', self._parse_bool, False) 

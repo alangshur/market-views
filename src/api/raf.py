@@ -1,7 +1,7 @@
 from datetime import timedelta
 import requests
 
-from src.utils.functional.identifiers import check_ticker, to_string
+from src.utils.functional.identifiers import check_ticker, to_string, parse_cik
 from src.api.base import BaseAPIConnector
 from src.utils.mindex import MultiIndex
 
@@ -39,7 +39,7 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
                     return cached_item
             
             # get tickers data
-            self.logger.info('Loading get_tickers from internet.')
+            self.logger.info('Loading get_tickers from cloud.')
             response = requests.get(self.api_domain + 'cik_ticker.csv')
             response.raise_for_status()          
             content = str(response.content.decode('utf-8'))
@@ -55,10 +55,10 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
             for row in data:
                 try:
 
-                    cik = row[0]
-                    ticker = row[1]
-                    name = row[2]
-                    exchange = row[3]
+                    cik = parse_cik(to_string(row[0]))
+                    ticker = to_string(row[1])
+                    name = to_string(row[2])
+                    exchange = to_string(row[3])
                     if len(cik) == 0: continue
                     elif not check_ticker(ticker): continue
                     elif len(name) == 0: continue
@@ -66,7 +66,7 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
                     elif exchange.startswith('OTC'): continue
                     else:
                         multi_index.insert({
-                            'cik': to_string(row[0]),
+                            'cik': parse_cik(to_string(row[0])),
                             'ticker': to_string(row[1]),
                             'name': to_string(row[2]),
                             'exchange': to_string(row[3]),
@@ -114,7 +114,7 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
                     return cached_item
                 
             # get industries data
-            self.logger.info('Loading get_industries from internet.')
+            self.logger.info('Loading get_industries from cloud.')
             response = requests.get(self.api_domain + 'sic_naics.csv')
             response.raise_for_status()          
             content = str(response.content.decode('utf-8'))
@@ -178,7 +178,7 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
                     return cached_item
                 
             # get cusips data
-            self.logger.info('Loading get_cusips from internet.')
+            self.logger.info('Loading get_cusips from cloud.')
             response = requests.get(self.api_domain + 'cusip_ticker.csv')
             response.raise_for_status()          
             content = str(response.content.decode('utf-8'))
@@ -194,17 +194,17 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
             for row in data:
                 try:
 
-                    cik = row[3]
-                    ticker = row[1]
-                    issuer = row[0]
-                    cusip = row[2]
+                    cik = parse_cik(to_string(row[3]))
+                    ticker = to_string(row[1])
+                    issuer = to_string(row[0])
+                    cusip = to_string(row[2])
                     if len(cik) == 0: continue
                     elif not check_ticker(ticker): continue
                     elif len(issuer) == 0: continue
                     elif len(cusip) == 0: continue
                     else:
                         multi_index.insert({
-                            'cik': to_string(row[3]),
+                            'cik': parse_cik(to_string(row[3])),
                             'ticker': to_string(row[1]),
                             'issuer': to_string(row[0]),
                             'cusip': to_string(row[2])
@@ -248,7 +248,7 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
                     return cached_item
             
             # get leis data
-            self.logger.info('Loading get_leis from internet.')
+            self.logger.info('Loading get_leis from cloud.')
             response = requests.get(self.api_domain + 'cik_lei.csv')
             response.raise_for_status()          
             content = str(response.content.decode('utf-8'))
@@ -264,15 +264,15 @@ class RankAndFiledAPIConnector(BaseAPIConnector):
             for row in data:
                 try:
 
-                    cik = row[0]
-                    name = row[1]
-                    lei = row[2]
+                    cik = parse_cik(to_string(row[0]))
+                    name = to_string(row[1])
+                    lei = to_string(row[2])
                     if len(cik) == 0: continue
                     elif len(name) == 0: continue
                     elif len(lei) == 0: continue
                     else:
                         multi_index.insert({
-                            'cik': to_string(row[0]),
+                            'cik': parse_cik(to_string(row[0])),
                             'name': to_string(row[1]),
                             'lei': to_string(row[2]),
                             'legal_form': to_string(row[3])

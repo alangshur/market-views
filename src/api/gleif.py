@@ -35,7 +35,7 @@ class GLEIFAPIConnector(BaseAPIConnector):
                     return cached_item
             
             # get leis files data
-            self.logger.info('Loading get_leis from internet.')
+            self.logger.info('Loading get_leis from cloud.')
             response = requests.get(self.api_domain)
             response.raise_for_status()
             data_files = response.json()

@@ -4,6 +4,12 @@ import re
 from src.utils.mindex import MultiIndex
 
 
+def parse_cik(cik: str) -> str:
+    cik = cik.lstrip('0')
+    cik = str(int(cik))
+    return cik
+
+
 def remove_lowercase(string: str) -> str:
     string = re.sub('[a-z]', '', string)
     return string

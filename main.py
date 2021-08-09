@@ -48,4 +48,5 @@ ticker_mem_loader.update()
 # - add historical data API (data loader)
 # - add historical splits (mem loader)
 # - add historical dividends (mem loader)
+# - add cik to ticker/name endpoint
 # - add current dividend data to ticker mapping

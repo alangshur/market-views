@@ -57,6 +57,21 @@ class MultiIndex(object):
             obj = objs[self.iteration]
             self.iteration += 1
             return obj
+
+    def __getitem__(self, item):
+        if isinstance(item, str):
+            if self.default_index_key is None:
+                raise MultiIndexException('default key must be specified for string indexing')
+            else:
+                return self.get(self.default_index_key, item)
+        elif isinstance(item, int):
+            objs = self.get_all()
+            return objs[item]
+        elif isinstance(item, slice):
+            objs = self.get_all()
+            return objs[item]
+        else:
+            raise MultiIndexException('invalid index type')
             
     def reset(self) -> None:
         self.iteration = 0
