@@ -32,15 +32,17 @@ from src.api.gleif import GLEIFAPIConnector
 # print(monitor_metrics)
 
 
-redis_connector = RedisStorageConnector(credentials_file_path='config/redis.json')
+# redis_connector = RedisStorageConnector(credentials_file_path='config/redis.json')
 
 polygon_connector = PolygonAPIConnector(credentials_file_path='config/polygon.json')
-raf_connector = RankAndFiledAPIConnector(credentials_file_path='config/raf.json')
-sec_gov_connector = SECGovAPIConnector(credentials_file_path='config/secgov.json')
-gleif_connector = GLEIFAPIConnector(credentials_file_path='config/gleif.json')
+# raf_connector = RankAndFiledAPIConnector(credentials_file_path='config/raf.json')
+# sec_gov_connector = SECGovAPIConnector(credentials_file_path='config/secgov.json')
+# gleif_connector = GLEIFAPIConnector(credentials_file_path='config/gleif.json')
 
-ticker_mem_loader = TickerMemLoader(redis_connector, polygon_connector, raf_connector, sec_gov_connector, gleif_connector)
-ticker_mem_loader.update()
+# ticker_mem_loader = TickerMemLoader(redis_connector, polygon_connector, raf_connector, sec_gov_connector, gleif_connector)
+# ticker_mem_loader.update()
+
+print(polygon_connector.get_internal_ticker_quotes())
 
 
 # TODO: 

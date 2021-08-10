@@ -28,7 +28,7 @@ pathlib.Path('redis/').mkdir(parents=True, exist_ok=True)
 # start redis
 if args.start:
     p_names = os.popen('ps aux').read()
-    if 'redis-server' in p_names:
+    if 'redis-server 127.0.0.1:7000' in p_names:
         print('Redis is already started.', flush=True)
     else:
         print('Starting redis... ', end='', flush=True)
@@ -40,9 +40,9 @@ if args.start:
 # stop redis
 if args.stop:
     p_names = os.popen('ps aux').read()
-    if 'redis-server' in p_names:
+    if 'redis-server 127.0.0.1:7000' in p_names:
         print('Stopping redis... ', end='', flush=True)
-        os.system("""ps aux | grep -v "grep" | grep "redis-server" | awk '{print $2}' | xargs kill -2""")
+        os.system("""ps aux | grep -v "grep" | grep "redis-server 127.0.0.1:7000" | awk '{print $2}' | xargs kill -2""")
         print('Done.', flush=True)
     else:
         print('Redis is not started.', flush=True)

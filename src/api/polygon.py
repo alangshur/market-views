@@ -1,4 +1,4 @@
-from datetime import timezone, timedelta
+from datetime import timezone, timedelta, datetime
 from dateutil import parser
 from typing import Any
 from tqdm import tqdm
@@ -6,6 +6,7 @@ import requests
 import time
 
 from src.utils.functional.identifiers import check_ticker, to_string, parse_cik
+from src.utils.functional.prices import parse_price
 from src.utils.mindex import MultiIndex
 from src.api.base import BaseAPIConnector
 
@@ -14,93 +15,6 @@ class PolygonAPIConnector(BaseAPIConnector):
 
     def __init__(self, credentials_file_path: str):
         super().__init__(self.__class__.__name__, credentials_file_path)
-
-    def get_market_status(self) -> dict:
-        try:
-            return self._query_endpoint(
-                endpoint_name='now',    
-                alt_domain=self.api_credentials['api-domain-status'],
-                check_ok=False
-            )
-
-        except Exception as e:
-            self.logger.exception('Error in get_market_status: ' + str(e))
-            return None
-    
-    def get_upcoming_holidays(self) -> list:
-        try:
-            return self._query_endpoint(
-                endpoint_name='upcoming',    
-                alt_domain=self.api_credentials['api-domain-status'],
-                check_ok=False
-            )
-
-        except Exception as e:
-            self.logger.exception('Error in get_upcoming_holidays: ' + str(e))
-            return None
-    
-    def get_stock_splits(self, ticker: str) -> list:
-        try:
-            assert(len(ticker) > 0, 'no tickers specified')
-            result = self._query_endpoint(
-                endpoint_name='splits/' + ticker,    
-                alt_domain=self.api_credentials['api-domain-v2']
-            )
-
-            if len(result) > 0: return result
-            else: return None
-
-        except Exception as e:
-            self.logger.exception('Error in get_stock_splits: ' + str(e))
-            return None
-
-    def get_stock_dividends(self, ticker: str) -> list:
-        try:
-            assert(len(ticker) > 0, 'no tickers specified')
-            result = self._query_endpoint(
-                endpoint_name='dividends/' + ticker,    
-                alt_domain=self.api_credentials['api-domain-v2']
-            )
-
-            if len(result) > 0: return result
-            else: return None
-
-        except Exception as e:
-            self.logger.exception('Error in get_stock_dividends: ' + str(e))
-            return None
-
-    def get_ticker_types(self) -> dict:
-        try:
-            return self._query_endpoint(
-                endpoint_name='types',    
-                alt_domain=self.api_credentials['api-domain-v2']
-            )
-
-        except Exception as e:
-            self.logger.exception('Error in get_ticker_types: ' + str(e))
-            return None
-    
-    def get_markets(self) -> list:
-        try:
-            return self._query_endpoint(
-                endpoint_name='markets',    
-                alt_domain=self.api_credentials['api-domain-v2']
-            )
-
-        except Exception as e:
-            self.logger.exception('Error in get_markets: ' + str(e))
-            return None
-
-    def get_locales(self) -> list:
-        try:
-            return self._query_endpoint(
-                endpoint_name='locales',
-                alt_domain=self.api_credentials['api-domain-v2']
-            )
-
-        except Exception as e:
-            self.logger.exception('Error in get_locales: ' + str(e))
-            return None
 
     def get_internal_exchanges(self) -> MultiIndex:
         """
@@ -179,9 +93,9 @@ class PolygonAPIConnector(BaseAPIConnector):
             # verify response
             response.raise_for_status()
             json_response = response.json()
-            assert(json_response['status'] == 'OK', 'bad response status')
-            assert(json_response['count'] > 0, 'no data in response')
-            assert(len(json_response['next_url']) > 0, 'no next_url in response')
+            assert json_response['status'] == 'OK', 'bad response status'
+            assert json_response['count'] > 0, 'no data in response'
+            assert len(json_response['next_url']) > 0, 'no next_url in response'
             tickers_data.extend(json_response['results'])
             next_url = json_response['next_url']
 
@@ -200,8 +114,8 @@ class PolygonAPIConnector(BaseAPIConnector):
                 # verify response
                 response.raise_for_status()
                 json_response = response.json()
-                assert(json_response['status'] == 'OK', 'bad response status')
-                assert(json_response['count'] > 0, 'no data in response')
+                assert json_response['status'] == 'OK', 'bad response status'
+                assert json_response['count'] > 0, 'no data in response'
                 tickers_data.extend(json_response['results'])
 
                 # check next url
@@ -243,10 +157,9 @@ class PolygonAPIConnector(BaseAPIConnector):
             self.logger.exception('Error in get_internal_tickers: ' + str(e))
             return None
     
-    def get_internal_ticker_quotes(self,
+    def get_internal_ticker_quotes(self, internal_tickers: MultiIndex,
                                    no_cache: bool=False,
-                                   cache_expiry_delta: timedelta=timedelta(days=30),
-                                   progress_bar: bool=False) -> MultiIndex:
+                                   cache_expiry_delta: timedelta=timedelta(days=30)) -> MultiIndex:
 
         """
             Returns a multi-index with the following fields for all 
@@ -258,48 +171,143 @@ class PolygonAPIConnector(BaseAPIConnector):
         try: 
 
             # get internal tickers
-            internal_tickers = self.get_internal_tickers()
             internal_tickers = internal_tickers.get_all_key_values('ticker')
-            internal_tickers_str = ','.join(internal_tickers)
 
             # query ticker quotes
             self.logger.info('Loading get_internal_ticker_quotes from cloud.')
             response = requests.get(
                 url=self.api_credentials['api-domain-snapshot'] + 'tickers', 
                 params={
-                    'apiKey': self.api_key,
-                    'tickers': internal_tickers_str
+                    'apiKey': self.api_key
                 }
             )
 
             # verify response
             response.raise_for_status()
             json_response = response.json()
-            assert(json_response['status'] == 'DELAYED', 'bad response status')
+            assert json_response['status'] == 'DELAYED', 'bad response status'
             
             # check cache if empty response
-            if len(json_response['count']) == 0 and not no_cache:
+            if json_response['count'] < len(internal_tickers) and not no_cache:
                 cached_item = self._get_cache('get_internal_ticker_quotes', 'all')
                 if cached_item is not None: 
                     self.logger.info('Loading get_internal_ticker_quotes from cache.')
                     return cached_item
                 else:
                     raise Exception('no data in response')
-            elif len(json_response['count']) == 0:
+            elif json_response['count'] == 0:
                 raise Exception('no data in response')
-            elif len(json_response['count']) != len(internal_tickers):
+            elif json_response['count'] < len(internal_tickers):
                 raise Exception('missing data in response')
 
             # get ticker quotes data
             indices = ['ticker']
             multi_index = MultiIndex(indices, default_index_key='ticker', safe_mode=True)
-            for ticker in json_response['tickers']:
+            for ticker_quote in json_response['tickers']:
+                ticker = ticker_quote['ticker']
+                last_updated = datetime.fromtimestamp(int(ticker_quote['updated']) / 1e9, tz=timezone.utc).isoformat()
+                if ticker not in internal_tickers:
+                    continue
 
-                # TODO: implement ticker quotes
-                pass
+                # get last quote
+                try:
+                    bid_price = parse_price(ticker_quote['lastQuote']['p'])
+                    bid_size = int(ticker_quote['lastQuote']['s'])
+                    ask_price = parse_price(ticker_quote['lastQuote']['P'])
+                    ask_size = int(ticker_quote['lastQuote']['S'])
+                    mid_price = parse_price((bid_price + ask_price) / 2)
+                    weigted_mid_price = parse_price((bid_price * ask_size + ask_price * bid_size) / (ask_size + bid_size))
+                    timestamp = datetime.fromtimestamp(int(ticker_quote['lastQuote']['t']) / 1e9, tz=timezone.utc).isoformat()
+                    quote = {
+                        'bid_price': bid_price,
+                        'bid_size': bid_size,
+                        'ask_price': ask_price,
+                        'ask_size': ask_size,
+                        'mid_price': mid_price,
+                        'weighted_mid_price': weigted_mid_price,
+                        'timestamp': timestamp
+                    }
+                except Exception:
+                    continue
+
+                # get minute bar
+                try:
+                    high = parse_price(ticker_quote['min']['h'])
+                    low = parse_price(ticker_quote['min']['l'])
+                    open = parse_price(ticker_quote['min']['o'])
+                    close = parse_price(ticker_quote['min']['c'])
+                    vwap = parse_price(ticker_quote['min']['vw'])
+                    volume = int(ticker_quote['min']['v'])
+                    minute_bar = {
+                        'high': high,
+                        'low': low,
+                        'open': open,
+                        'close': close,
+                        'vwap': vwap,
+                        'volume': volume
+                    }
+                except Exception:
+                    minute_bar = None
+
+                # get day bar
+                try:
+                    high = parse_price(ticker_quote['day']['h'])
+                    low = parse_price(ticker_quote['day']['l'])
+                    open = parse_price(ticker_quote['day']['o'])
+                    close = parse_price(ticker_quote['day']['c'])
+                    vwap = parse_price(ticker_quote['day']['vw'])
+                    volume = int(ticker_quote['day']['v'])
+                    absolute_change = round(float(weigted_mid_price - open), 6)
+                    relative_change = round(float((weigted_mid_price - open) / open), 6)
+                    day_bar = {
+                        'high': high,
+                        'low': low,
+                        'open': open,
+                        'close': close,
+                        'vwap': vwap,
+                        'volume': volume,
+                        'absolute_change': absolute_change,
+                        'relative_change': relative_change
+                    }
+                except Exception:
+                    day_bar = None
+
+                # get previous day bar
+                try:
+                    high = parse_price(ticker_quote['prevDay']['h'])
+                    low = parse_price(ticker_quote['prevDay']['l'])
+                    open = parse_price(ticker_quote['prevDay']['o'])
+                    close = parse_price(ticker_quote['prevDay']['c'])
+                    vwap = parse_price(ticker_quote['prevDay']['vw'])
+                    volume = int(ticker_quote['prevDay']['v'])
+                    absolute_change = round(float(close - open), 6)
+                    relative_change = round(float((close - open) / open), 6)
+                    prev_day_bar = {
+                        'high': high,
+                        'low': low,
+                        'open': open,
+                        'close': close,
+                        'vwap': vwap,
+                        'volume': volume,
+                        'absolute_change': absolute_change,
+                        'relative_change': relative_change
+                    }
+                except Exception:
+                    prev_day_bar = None
+
+                multi_index.insert({
+                    'ticker': ticker,
+                    'last_updated': last_updated,
+                    'quote': quote,
+                    'minute_bar': minute_bar,
+                    'day_bar': day_bar,
+                    'prev_day_bar': prev_day_bar
+                })
 
             # cache item
-            if not no_cache:
+            if len(multi_index) < int(0.95 * len(internal_tickers)):
+                raise Exception('not enough quotes processed')
+            elif not no_cache:
                 self._add_cache('get_internal_ticker_quotes', 'all', multi_index, 
                                 expiry_delta=cache_expiry_delta)
 
@@ -309,7 +317,7 @@ class PolygonAPIConnector(BaseAPIConnector):
             self.logger.exception('Error in get_internal_ticker_quotes: ' + str(e))
             return None
 
-    def get_internal_ticker_details(self,
+    def get_internal_ticker_details(self, internal_tickers: MultiIndex,
                                     no_cache: bool=False,
                                     cache_expiry_delta: timedelta=timedelta(days=30),
                                     progress_bar: bool=False) -> MultiIndex:
@@ -349,7 +357,6 @@ class PolygonAPIConnector(BaseAPIConnector):
                     return cached_item
 
             # get internal tickers
-            internal_tickers = self.get_internal_tickers()
             internal_tickers = internal_tickers.get_all_key_values('ticker')
                 
             # get ticker details data
@@ -403,7 +410,7 @@ class PolygonAPIConnector(BaseAPIConnector):
             self.logger.exception('Error in get_internal_ticker_details: ' + str(e))
             return None
 
-    def get_internal_ticker_dividends(self, 
+    def get_internal_ticker_dividends(self, internal_tickers: MultiIndex, ticker_quotes: MultiIndex,
                                       no_cache: bool=False,
                                       cache_expiry_delta: timedelta=timedelta(days=30),
                                       progress_bar: bool=False) -> MultiIndex:
@@ -425,7 +432,6 @@ class PolygonAPIConnector(BaseAPIConnector):
                     return cached_item
 
             # get internal tickers
-            internal_tickers = self.get_internal_tickers()
             internal_tickers = internal_tickers.get_all_key_values('ticker')
                 
             # get ticker details data
@@ -440,6 +446,11 @@ class PolygonAPIConnector(BaseAPIConnector):
                         endpoint_name='dividends/{}'.format(ticker),    
                         alt_domain=self.api_credentials['api-domain-v2']
                     )
+
+                    # get ticker quote
+                    quote = ticker_quotes.get('ticker', ticker)
+                    if quote is None: continue
+                    else: price = quote['quote']['weighted_mid_price']
                     
                     # get last year dividends
                     idx = 0
@@ -453,17 +464,33 @@ class PolygonAPIConnector(BaseAPIConnector):
                         cur_dividend_date = ticker_dividends[idx]['paymentDate']
                         cur_dividend_date = parser.parse(cur_dividend_date).date()
 
-                    # get dividend yield
+                    # get dividend metrics
                     if len(annual_dividends) > 6:
+                        dividend_type = 'monthly'
                         annual_dividends = annual_dividends[:12]
-                        rolling_annual_dividend = sum(annual_dividends)
-                        annual_dividend = annual_dividends[0] * 12
+                        rolling_annual_dividend = float(sum(annual_dividends))
+                        annual_dividend = float(annual_dividends[0] * 12)
+                        dividend_yield = round(float(annual_dividend / price), 6)
                     else:
+                        dividend_type = 'quarterly'
                         annual_dividends = annual_dividends[:4]
-                        rolling_annual_dividend = sum(annual_dividends)
-                        annual_dividend = annual_dividends[0] * 4
+                        rolling_annual_dividend = float(sum(annual_dividends))
+                        annual_dividend = float(annual_dividends[0] * 4)
+                        dividend_yield = round(float(annual_dividend / price), 6)
 
-                    # TODO: calculate dividend yield and all stats
+                    multi_index.insert({
+                        'ticker': ticker,
+                        'dividend_type': dividend_type,
+                        'rolling_annual_dividend': rolling_annual_dividend,
+                        'annual_dividend': annual_dividend,
+                        'dividend_yield': dividend_yield,
+                        'last_dividend': {
+                            'amount': float(ticker_dividends[0]['amount']),
+                            'ex_date': parser.parse(ticker_dividends[0]['exDate']).astimezone(timezone.utc).isoformat(),
+                            'payment_date': parser.parse(ticker_dividends[0]['paymentDate']).astimezone(timezone.utc).isoformat(),
+                            'record_date': parser.parse(ticker_dividends[0]['recordDate']).astimezone(timezone.utc).isoformat()
+                        }
+                    })
 
                 except Exception:
                     pass
@@ -519,7 +546,7 @@ class PolygonAPIConnector(BaseAPIConnector):
             # verify response
             response.raise_for_status()
             json_response = response.json()
-            assert(json_response['status'] == 'OK', 'bad response status')
+            assert json_response['status'] == 'OK', 'bad response status'
             return json_response
 
         except Exception:
@@ -546,8 +573,8 @@ class PolygonAPIConnector(BaseAPIConnector):
         response.raise_for_status()
         json_response = response.json()
         if check_ok:
-            if delayed_status: assert(json_response['status'] == 'DELAYED', 'bad response status')
-            else: assert(json_response['status'] == 'OK', 'bad response status')
+            if delayed_status: assert json_response['status'] == 'DELAYED', 'bad response status'
+            else: assert json_response['status'] == 'OK', 'bad response status'
             return json_response['results']
         else:
             return json_response
