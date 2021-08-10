@@ -42,7 +42,8 @@ polygon_connector = PolygonAPIConnector(credentials_file_path='config/polygon.js
 # ticker_mem_loader = TickerMemLoader(redis_connector, polygon_connector, raf_connector, sec_gov_connector, gleif_connector)
 # ticker_mem_loader.update()
 
-print(polygon_connector.get_internal_ticker_quotes())
+tickers = polygon_connector.get_internal_tickers()
+print(polygon_connector.get_internal_ticker_financials(tickers, no_cache=True, progress_bar=True)['AAPL'])
 
 
 # TODO: 

@@ -166,6 +166,11 @@ class PolygonAPIConnector(BaseAPIConnector):
             internal tickers:
 
             - ticker (index)
+            - last_updated
+            - quote
+            - minute_bar
+            - day_bar
+            - prev_day_bar
         """
 
         try: 
@@ -307,7 +312,7 @@ class PolygonAPIConnector(BaseAPIConnector):
             # cache item
             if len(multi_index) < int(0.95 * len(internal_tickers)):
                 raise Exception('not enough quotes processed')
-            elif not no_cache:
+            else:
                 self._add_cache('get_internal_ticker_quotes', 'all', multi_index, 
                                 expiry_delta=cache_expiry_delta)
 
@@ -400,14 +405,113 @@ class PolygonAPIConnector(BaseAPIConnector):
                     pass
                 
             # cache item
-            if not no_cache:
-                self._add_cache('get_internal_ticker_details', 'all', multi_index, 
-                                expiry_delta=cache_expiry_delta)
+            self._add_cache('get_internal_ticker_details', 'all', multi_index, 
+                            expiry_delta=cache_expiry_delta)
 
             return multi_index
             
         except Exception as e:
             self.logger.exception('Error in get_internal_ticker_details: ' + str(e))
+            return None
+
+    def get_internal_ticker_financials(self, internal_tickers: MultiIndex,
+                                       no_cache: bool=False,
+                                       cache_expiry_delta: timedelta=timedelta(days=30),
+                                       progress_bar: bool=False) -> MultiIndex:
+
+        """
+            Returns a multi-index with the following fields for all 
+            internal tickers:
+
+            - ticker (index)
+            - name
+            - last_quarterly_report
+            - last_annual_report
+        """
+
+        try: 
+
+            # check cache
+            if not no_cache:
+                cached_item = self._get_cache('get_internal_ticker_financials', 'all')
+                if cached_item is not None: 
+                    self.logger.info('Loading get_internal_ticker_financials from cache.')
+                    return cached_item
+
+            # get internal tickers
+            internal_tickers = internal_tickers.get_all_key_values('ticker')
+                
+            # get ticker details data
+            self.logger.info('Loading get_internal_ticker_financials from cloud.')
+            indices = ['ticker']
+            multi_index = MultiIndex(indices, default_index_key='ticker', safe_mode=True)
+            for ticker in tqdm(internal_tickers, disable=not progress_bar):
+                try:
+
+                    # query quarterly financial details
+                    quarterly_financials = self._query_endpoint(
+                        endpoint_name='financials', 
+                        alt_domain=self.api_credentials['api-domain-vx'],
+                        additional_params={
+                            'ticker': ticker,
+                            'limit': 1,
+                            'timeframe': 'quarterly'
+                        }
+                    )
+
+                    # parse quarterly details
+                    fiscal_period = str(quarterly_financials[0]['fiscal_period']) + ' ' + str(quarterly_financials[0]['fiscal_year'])
+                    quarterly_details = {'fiscal_period': fiscal_period}
+                    quarterly_financials = quarterly_financials[0]['financials']
+                    if quarterly_financials is None or len(quarterly_financials) == 0: continue
+                    for financial_class in quarterly_financials.keys():
+                        quarterly_details[financial_class] = {}
+                        for key, value in quarterly_financials[financial_class].items():
+                            quarterly_details[financial_class][key] = value['value']
+                        if len(quarterly_details[financial_class]) == 0:
+                            quarterly_details[financial_class] = None
+
+                    # query annual financial details
+                    annual_financials = self._query_endpoint(
+                        endpoint_name='financials', 
+                        alt_domain=self.api_credentials['api-domain-vx'],
+                        additional_params={
+                            'ticker': ticker,
+                            'limit': 1,
+                            'timeframe': 'annual'
+                        }
+                    )
+
+                    # parse annual details
+                    fiscal_year = str(annual_financials[0]['fiscal_year'])
+                    annual_details = {'fiscal_year': fiscal_year}
+                    annual_financials = annual_financials[0]['financials']
+                    if annual_financials is None or len(annual_financials) == 0: continue
+                    for financial_class in annual_financials.keys():
+                        annual_details[financial_class] = {}
+                        for key, value in annual_financials[financial_class].items():
+                            annual_details[financial_class][key] = value['value']
+                        if len(annual_details[financial_class]) == 0:
+                            annual_details[financial_class] = None
+
+                    # insert indices
+                    multi_index.insert({
+                        'ticker': ticker,
+                        'last_quarterly_report': quarterly_details,
+                        'last_annual_report': annual_details
+                    })
+
+                except Exception:
+                    pass
+                
+            # cache item
+            self._add_cache('get_internal_ticker_financials', 'all', multi_index, 
+                            expiry_delta=cache_expiry_delta)
+
+            return multi_index
+            
+        except Exception as e:
+            self.logger.exception('Error in get_internal_ticker_financials: ' + str(e))
             return None
 
     def get_internal_ticker_dividends(self, internal_tickers: MultiIndex, ticker_quotes: MultiIndex,
@@ -496,9 +600,8 @@ class PolygonAPIConnector(BaseAPIConnector):
                     pass
                 
             # cache item
-            if not no_cache:
-                self._add_cache('get_internal_ticker_dividends', 'all', multi_index, 
-                                expiry_delta=cache_expiry_delta)
+            self._add_cache('get_internal_ticker_dividends', 'all', multi_index, 
+                            expiry_delta=cache_expiry_delta)
 
             return multi_index
             
