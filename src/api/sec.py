@@ -18,8 +18,7 @@ class SECAPIConnector(BaseAPIConnector):
     def __init__(self, credentials_file_path: str):
         super().__init__(self.__class__.__name__, credentials_file_path)
         
-    def query_13f_filings(self, fetch_from_dt: datetime, tickers: MultiIndex,
-                          ciks: MultiIndex,
+    def query_13f_filings(self, fetch_from_dt: datetime, tickers: MultiIndex, ciks: MultiIndex,
                           progress_bar: bool=True) -> Tuple[list, datetime]:
 
         try:
@@ -68,6 +67,9 @@ class SECAPIConnector(BaseAPIConnector):
                     continue
 
                 # verify ciks
+                cik = parse_cik(to_string(filing['cik']))
+                cik_data = ciks.get('cik', cik)
+                if cik_data is None: continue
 
                 # clean holdings data
                 cleaned_holdings = []
@@ -79,14 +81,13 @@ class SECAPIConnector(BaseAPIConnector):
                         self.logger.error('Bad CUSIP encountered: {}.'.format(cusip))
                         continue
 
-                    # query ticker from cusip
+                    # verify ciks
                     ticker_data = tickers.get('cusip', cusip)
                     if ticker_data is None: continue
                     else: ticker = ticker_data['ticker']
 
                     # insert holding
                     cleaned_holdings.append({
-                        'issuer_name': holding['nameOfIssuer'],
                         'ticker': ticker,
                         'value': float(holding['value']),
                         'shares': int(float(holding['shrsOrPrnAmt']['sshPrnamt']))
@@ -99,11 +100,8 @@ class SECAPIConnector(BaseAPIConnector):
                 # clean filing data
                 cleaned_filings.append({
                     'id': str(uuid.uuid4().hex),
-                    'accession_number': filing['accessionNo'],
                     'cik': parse_cik(to_string(filing['cik'])),
-                    'ticker': to_string(filing['ticker']),
-                    'company_name': filing['companyName'],
-                    'company_name_long': filing['companyNameLong'],
+                    'accession_number': filing['accessionNo'],
                     'form_type': filing['formType'],
                     'filed_at': parser.parse(filing['filedAt']).astimezone(timezone.utc).isoformat(),
                     'report_period': filing['periodOfReport'],
@@ -116,7 +114,7 @@ class SECAPIConnector(BaseAPIConnector):
             self.logger.exception('Error in query_13f_filings: ' + str(e))
             return None
 
-    def query_form_4_filings(self, fetch_from_dt: datetime,
+    def query_form_4_filings(self, fetch_from_dt: datetime, tickers: MultiIndex,
                              fetch_delay_secs: int=0,
                              progress_bar: bool=True) -> Tuple[list, datetime]:
                              
@@ -166,9 +164,8 @@ class SECAPIConnector(BaseAPIConnector):
                 xml_url = filing_documents[1]['documentUrl']
 
                 # fetch xml form
-                cleaned_filing = self._fetch_form_4_xml_data(xml_url)
-                if cleaned_filing is not None: 
-                    cleaned_filings.append(cleaned_filing)
+                cleaned_filing = self._fetch_form_4_xml_data(xml_url, tickers)
+                if cleaned_filing is not None: cleaned_filings.append(cleaned_filing)
                 time.sleep(fetch_delay_secs)
 
             return cleaned_filings, next_fetch_from_dt
@@ -193,7 +190,7 @@ class SECAPIConnector(BaseAPIConnector):
         except Exception:
             return None
     
-    def _fetch_form_4_xml_data(self, xml_url: str) -> dict:
+    def _fetch_form_4_xml_data(self, xml_url: str, tickers: MultiIndex) -> dict:
 
         # query xml form
         session = HTMLSession()
@@ -209,21 +206,21 @@ class SECAPIConnector(BaseAPIConnector):
         form_data['id'] = str(uuid.uuid4().hex)
         form_data['report_period'] = content.find('periodofreport').get_text()
 
-        # get issuer data
-        form_data['issuer'] = {}
+        # get issuer fields
         issuer_information = content.find('issuer')
-        form_data['issuer']['cik'] = parse_cik(to_string(issuer_information.find('issuercik').get_text()))
-        form_data['issuer']['ticker'] = to_string(issuer_information.find('issuertradingsymbol').get_text())
-        form_data['issuer']['name'] = to_string(issuer_information.find('issuername').get_text())
-
-        # validate metadata fields
+        ticker = to_string(issuer_information.find('issuertradingsymbol').get_text())
+        cik = parse_cik(to_string(issuer_information.find('issuercik').get_text()))
+        ticker_record, cik_record = tickers.get('ticker', ticker), tickers.get('cik', cik)
         if not self._validate_date(form_data['report_period']): return None
-        elif len(form_data['issuer']['ticker']) == 0: return None
+        elif ticker_record is None and cik_record is None: return None
+        else:
+            if ticker_record is not None: ticker = ticker_record['ticker']
+            else: ticker = cik_record['ticker']
+            form_data['ticker'] = ticker
 
         # get reporting owner data
         form_data['reporting_owner'] = {}
         reporting_owner_information = content.find('reportingowner')
-        form_data['reporting_owner']['cik'] = parse_cik(to_string(reporting_owner_information.find('rptownercik').get_text()))
         form_data['reporting_owner']['name'] = to_string(reporting_owner_information.find('rptownername').get_text())
         form_data['reporting_owner']['is_director'] = self._validate_tag_value(reporting_owner_information, 'isdirector', self._parse_bool, False) 
         form_data['reporting_owner']['is_officer'] = self._validate_tag_value(reporting_owner_information, 'isofficer', self._parse_bool, False) 

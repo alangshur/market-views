@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from dateutil import parser
-import time
 
+from src.utils.mindex import MultiIndex
 from src.storage.s3 import S3StorageConnector
 from src.api.sec import SECAPIConnector
 from src.data.base import BaseDataLoaderModule
@@ -10,7 +10,8 @@ from src.data.base import BaseDataLoaderModule
 class SEC4DataLoader(BaseDataLoaderModule):
 
     def __init__(self, s3_connector: S3StorageConnector, sec_connector: SECAPIConnector, 
-                 manifest_s3_bucket_name: str, manifest_s3_object_name: str, data_s3_bucket_name: str, 
+                 tickers: MultiIndex, manifest_s3_bucket_name: str, 
+                 manifest_s3_object_name: str, data_s3_bucket_name: str, 
                  delay_time_secs: int=0,
                  fetch_from_override_dt: datetime=None):
 
@@ -18,6 +19,7 @@ class SEC4DataLoader(BaseDataLoaderModule):
                          manifest_s3_object_name, data_s3_bucket_name)
 
         self.sec_connector = sec_connector
+        self.tickers = tickers
         self.delay_time_secs = delay_time_secs
         self.fetch_from_override_dt = fetch_from_override_dt
 
@@ -47,12 +49,13 @@ class SEC4DataLoader(BaseDataLoaderModule):
 
                 # query SEC API
                 query_result = self.sec_connector.query_form_4_filings(
-                    fetch_from_dt=fetch_from_dt
+                    fetch_from_dt=fetch_from_dt,
+                    tickers=self.tickers
                 )
 
                 # verify result
                 if query_result is None:
-                    self.logger.info('Filings query failed.')
+                    self.logger.error('Filings query failed.')
                     return False
                 elif len(query_result[0]) == 0:
                     break

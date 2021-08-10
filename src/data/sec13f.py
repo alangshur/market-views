@@ -10,7 +10,7 @@ from src.data.base import BaseDataLoaderModule
 class SEC13FDataLoader(BaseDataLoaderModule):
     
     def __init__(self, s3_connector: S3StorageConnector, sec_connector: SECAPIConnector, 
-                 tickers: MultiIndex, manifest_s3_bucket_name: str,
+                 tickers: MultiIndex, ciks: MultiIndex, manifest_s3_bucket_name: str,
                  manifest_s3_object_name: str, data_s3_bucket_name: str,
                  delay_time_secs: int=0,
                  fetch_from_override_dt: datetime=None):
@@ -20,6 +20,7 @@ class SEC13FDataLoader(BaseDataLoaderModule):
 
         self.sec_connector = sec_connector
         self.tickers = tickers
+        self.ciks = ciks
         self.delay_time_secs = delay_time_secs
         self.fetch_from_override_dt = fetch_from_override_dt
 
@@ -50,12 +51,13 @@ class SEC13FDataLoader(BaseDataLoaderModule):
                 # query SEC API
                 query_result = self.sec_connector.query_13f_filings(
                     fetch_from_dt=fetch_from_dt,
-                    tickers=self.tickers
+                    tickers=self.tickers,
+                    ciks=self.ciks
                 )
 
                 # verify result
                 if query_result is None:
-                    self.logger.info('Filings query failed.')
+                    self.logger.error('Filings query failed.')
                     return False
                 elif len(query_result[0]) == 0:
                     break
