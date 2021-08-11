@@ -35,10 +35,25 @@ class TickerMemLoader(BaseMemLoaderModule):
             if ticker_data is None:
                 raise Exception('missing ticker data')
 
-            # fetch ticker details data
-            ticker_details_data = self.polygon_connector.get_internal_ticker_details()
+            # fetch POLYGON ticker details data
+            ticker_details_data = self.polygon_connector.get_internal_ticker_details(ticker_data)
             if ticker_details_data is None:
                 raise Exception('missing ticker details data')
+
+            # fetch POLYGON exchange data
+            exchange_data = self.polygon_connector.get_internal_exchanges()
+            if exchange_data is None:
+                raise Exception('missing exchange data')
+
+            # fetch POLYGON quotes data
+            quotes_data = self.polygon_connector.get_internal_ticker_quotes(ticker_data)
+            if quotes_data is None:
+                raise Exception('missing quotes data')
+
+            # fetch POLYGON dividend data
+            dividend_data = self.polygon_connector.get_internal_ticker_dividends(ticker_data, quotes_data)
+            if dividend_data is None:
+                raise Exception('missing dividend data')
 
             # fetch SEC cik data
             cik_data = self.sec_gov_connector.get_ciks()
@@ -60,20 +75,15 @@ class TickerMemLoader(BaseMemLoaderModule):
             if raf_lei_data is None:
                 raise Exception('missing RAF lei data')
 
+            # fetch RAF sector data
+            industry_data = self.raf_connector.get_industries()
+            if industry_data is None:
+                raise Exception('missing industry data')
+
             # fetch GLEIF lei data
             gleif_lei_data = self.gleif_connector.get_leis()
             if gleif_lei_data is None:
                 raise Exception('missing GEIF lei data')
-
-            # fetch exchange data
-            exchange_data = self.polygon_connector.get_internal_exchanges()
-            if exchange_data is None:
-                raise Exception('missing exchange data')
-
-            # fetch sector data
-            industry_data = self.raf_connector.get_industries()
-            if industry_data is None:
-                raise Exception('missing industry data')
 
             # build multi-index
             self.logger.info('Building ticker mapping.')
@@ -159,6 +169,8 @@ class TickerMemLoader(BaseMemLoaderModule):
                         ticker_mapping['details']['address'] = ticker_details_data_obj['hq_address']
                         ticker_mapping['details']['state'] = ticker_details_data_obj['hq_state']
                         ticker_mapping['details']['country'] = ticker_details_data_obj['hq_country']
+                    else:
+                        ticker_mapping['details'] = None
                     
                     # get exchange data
                     mic = ticker_data_obj['exchange_mic']
@@ -172,6 +184,20 @@ class TickerMemLoader(BaseMemLoaderModule):
                     else: sic = None
                     industry_data_obj = industry_data.get('sic', sic)
                     if nn(industry_data_obj): ticker_mapping['industry'] = industry_data_obj
+                    else: ticker_mapping['industry'] = None
+
+                    # get dividend data
+                    dividend_data_obj = dividend_data.get('ticker', ticker)
+                    if nn(dividend_data_obj): 
+                        ticker_mapping['dividend'] = {
+                            'dividend_type': dividend_data_obj['dividend_type'],
+                            'rolling_annual_dividend': dividend_data_obj['rolling_annual_dividend'],
+                            'annual_dividend': dividend_data_obj['annual_dividend'],
+                            'dividend_yield': dividend_data_obj['dividend_yield'],
+                            'last_dividend': dividend_data_obj['last_dividend']
+                        }
+                    else: 
+                        ticker_mapping['dividend'] = None
 
                     # insert mapping
                     multi_index.insert(ticker_mapping)

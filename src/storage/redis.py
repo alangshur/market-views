@@ -22,11 +22,18 @@ class RedisStorageConnector(BaseStorageConnector):
             socket_keepalive=True
         )
 
+        # init key store
+        self.key_store = {}
+
     def get(self, key) -> Any:
         return self.redis.get(key)
 
     def set(self, key, value, timeout=None) -> bool:
-        return bool(self.redis.set(key, value, timeout=timeout))
+        result = bool(self.redis.set(key, value, timeout=timeout))
+        if result: self.key_store.add(key)
+        return result
 
     def delete(self, key) -> bool:
-        return bool(self.redis.delete(key))
+        result = bool(self.redis.delete(key))
+        if result: self.key_store.discard(key)
+        return result

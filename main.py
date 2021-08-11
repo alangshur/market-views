@@ -33,7 +33,6 @@ from src.api.gleif import GLEIFAPIConnector
 
 
 # redis_connector = RedisStorageConnector(credentials_file_path='config/redis.json')
-
 polygon_connector = PolygonAPIConnector(credentials_file_path='config/polygon.json')
 # raf_connector = RankAndFiledAPIConnector(credentials_file_path='config/raf.json')
 # sec_gov_connector = SECGovAPIConnector(credentials_file_path='config/secgov.json')
@@ -43,13 +42,5 @@ polygon_connector = PolygonAPIConnector(credentials_file_path='config/polygon.js
 # ticker_mem_loader.update()
 
 tickers = polygon_connector.get_internal_tickers()
-print(polygon_connector.get_internal_ticker_financials(tickers, no_cache=True, progress_bar=True)['AAPL'])
-
-
-# TODO: 
-# - add last quote API (mem loader)
-# - add historical data API (data loader)
-# - add historical splits (mem loader)
-# - add historical dividends (mem loader)
-# - add cik to ticker/name endpoint
-# - add current dividend data to ticker mapping
+data = polygon_connector.get_internal_historical_quotes(tickers, progress_bar=True)
+print(data['MSFT'])

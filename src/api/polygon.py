@@ -1,7 +1,8 @@
-from datetime import timezone, timedelta, datetime
+from datetime import timezone, timedelta, datetime, date
 from dateutil import parser
 from typing import Any
 from tqdm import tqdm
+import pandas as pd
 import requests
 import time
 
@@ -310,16 +311,96 @@ class PolygonAPIConnector(BaseAPIConnector):
                 })
 
             # cache item
-            if len(multi_index) < int(0.95 * len(internal_tickers)):
-                raise Exception('not enough quotes processed')
-            else:
-                self._add_cache('get_internal_ticker_quotes', 'all', multi_index, 
-                                expiry_delta=cache_expiry_delta)
+            self._add_cache('get_internal_ticker_quotes', 'all', multi_index, 
+                            expiry_delta=cache_expiry_delta)
 
             return multi_index
             
         except Exception as e:
             self.logger.exception('Error in get_internal_ticker_quotes: ' + str(e))
+            return None
+
+    def get_internal_historical_quotes(self, internal_tickers: MultiIndex,
+                                       history_start_date: date=date(2000, 1, 1),
+                                       progress_bar: bool=False) -> MultiIndex:
+
+        """
+            Returns a multi-index with the following fields for all 
+            internal tickers:
+
+            - ticker (index)
+        """
+
+        try: 
+
+            # check cache
+            past_historical_quotes = self._get_cache('get_internal_historical_quotes', 'all')
+
+            # get internal tickers
+            internal_tickers = internal_tickers.get_all_key_values('ticker')
+                
+            # get ticker details data
+            self.logger.info('Loading get_internal_historical_quotes from cloud.')
+            indices = ['ticker']
+            multi_index = MultiIndex(indices, default_index_key='ticker', safe_mode=True)
+            for ticker in tqdm(internal_tickers, disable=not progress_bar):
+                try:
+                    
+                    # get previous historical data
+                    if past_historical_quotes is not None:
+                        cache_data = past_historical_quotes.get('ticker', ticker)
+                        if cache_data is not None: past_historical_quotes_df = cache_data['historical_quotes']
+                        else: past_historical_quotes_df = None
+                    else:
+                        cache_data = None
+                        past_historical_quotes_df = None
+
+                    # get start/end date strings
+                    if past_historical_quotes_df is None: start_date = str(history_start_date)
+                    else: start_date = past_historical_quotes_df.index[-1]
+                    if start_date == date.today(): raise Exception
+                    end_date = str(date.today() + timedelta(days=10))
+
+                    # query historical quotes
+                    historical_quotes = self._query_endpoint(
+                        endpoint_name='{}/range/1/day/{}/{}'.format(ticker, start_date, end_date),
+                        alt_domain=self.api_credentials['api-domain-aggs'],
+                        delayed_status=True
+                    )
+
+                    # validate result
+                    if historical_quotes is None or len(historical_quotes) == 0:
+                        raise Exception
+
+                    # parse quotes
+                    historical_quotes_df = pd.DataFrame.from_records(historical_quotes)
+                    historical_quotes_df.columns = ['volume', 'vwap', 'open', 'close', 'high', 'low', 'date', 'transactions']
+                    historical_quotes_df['date'] = pd.to_datetime(historical_quotes_df['date'], unit='ms').dt.date
+                    historical_quotes_df = historical_quotes_df.set_index('date', drop=True).sort_index(ascending=True)
+                    historical_quotes_df = historical_quotes_df.groupby(historical_quotes_df.index).first()                    
+
+                    # merge quotes
+                    if past_historical_quotes_df is not None:
+                        historical_quotes_df = pd.concat([past_historical_quotes_df, historical_quotes_df], axis=0)
+                        historical_quotes_df = historical_quotes_df.sort_index(ascending=True)
+                        historical_quotes_df = historical_quotes_df.groupby(historical_quotes_df.index).last()
+
+                    # insert indices
+                    multi_index.insert({
+                        'ticker': ticker,
+                        'historical_quotes': historical_quotes_df
+                    })
+
+                except Exception:
+                    if cache_data is not None:
+                        multi_index.insert(cache_data)
+                
+            # cache item
+            self._add_cache('get_internal_historical_quotes', 'all', multi_index)
+            return multi_index
+            
+        except Exception as e:
+            self.logger.exception('Error in get_internal_historical_quotes: ' + str(e))
             return None
 
     def get_internal_ticker_details(self, internal_tickers: MultiIndex,
@@ -607,52 +688,6 @@ class PolygonAPIConnector(BaseAPIConnector):
             
         except Exception as e:
             self.logger.exception('Error in get_internal_ticker_dividends: ' + str(e))
-            return None
-
-    def query_ticker_with_cusip(self, cusip: str) -> str:
-        try:
-
-            # send requests
-            attempts_count = 0
-            while True:
-                json_response = self._query_tickers_endpoint({
-                    'apiKey': self.api_key,
-                    'cusip': cusip,
-                    'limit': 1
-                })
-
-                if json_response is None and attempts_count > 3:
-                    raise Exception('query attempts failed')
-                elif json_response is None:
-                    attempts_count += 1
-                    time.sleep(1)
-                else:
-                    break
-    
-            # extract ticker
-            if json_response['results'] is None or len(json_response['results']) == 0: ticker = ''
-            else: ticker = to_string(json_response['results'][0]['ticker'])
-            if not check_ticker(ticker): ticker = ''
-            return ticker
-
-        except Exception as e:
-            self.logger.exception('Error in query_ticker_with_cusip: ' + str(e))
-            return None
-    
-    def _query_tickers_endpoint(self, params: dict) -> dict: 
-        try:
-            response = requests.get(
-                url=self.api_domain + 'tickers', 
-                params=params
-            )
-
-            # verify response
-            response.raise_for_status()
-            json_response = response.json()
-            assert json_response['status'] == 'OK', 'bad response status'
-            return json_response
-
-        except Exception:
             return None
 
     def _query_endpoint(self, endpoint_name: str,
