@@ -1,7 +1,6 @@
 import luhn
 
 from src.utils.functional.identifiers import nn, convert_letters_to_string_numbers
-from src.utils.logger import BaseModuleWithLogging
 from src.utils.mindex import MultiIndex, MultiIndexException
 from src.api.polygon import PolygonAPIConnector
 from src.api.raf import RankAndFiledAPIConnector
@@ -11,7 +10,7 @@ from src.mem.base import BaseMemLoaderModule
 from src.storage.redis import RedisStorageConnector
 
 
-class TickerMemLoader(BaseMemLoaderModule):
+class TickersMemLoader(BaseMemLoaderModule):
 
     def __init__(self, redis_connector: RedisStorageConnector,
                  polygon_connector: PolygonAPIConnector, 
@@ -20,7 +19,6 @@ class TickerMemLoader(BaseMemLoaderModule):
                  gleif_connector: GLEIFAPIConnector):
 
         super().__init__(self.__class__.__name__, redis_connector)
-
         self.polygon_connector = polygon_connector
         self.raf_connector = raf_connector
         self.sec_gov_connector = sec_gov_connector
@@ -206,10 +204,10 @@ class TickerMemLoader(BaseMemLoaderModule):
                     continue
 
             # save ticker data
-            self.logger.info('Saving new ticker data.')
+            self.logger.info('Saving new tickers data.')
             save_result = self._save_data('tickers', multi_index)
             if not save_result:
-                self.logger.error('Failed to save ticker data.')
+                self.logger.error('Failed to save tickers data.')
                 return False
 
             self.logger.info('Finishing update routine.')

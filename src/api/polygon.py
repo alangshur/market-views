@@ -405,7 +405,7 @@ class PolygonAPIConnector(BaseAPIConnector):
 
     def get_internal_ticker_details(self, internal_tickers: MultiIndex,
                                     no_cache: bool=False,
-                                    cache_expiry_delta: timedelta=timedelta(days=30),
+                                    cache_expiry_delta: timedelta=timedelta(days=7),
                                     progress_bar: bool=False) -> MultiIndex:
 
         """
@@ -497,7 +497,7 @@ class PolygonAPIConnector(BaseAPIConnector):
 
     def get_internal_ticker_financials(self, internal_tickers: MultiIndex,
                                        no_cache: bool=False,
-                                       cache_expiry_delta: timedelta=timedelta(days=30),
+                                       cache_expiry_delta: timedelta=timedelta(days=7),
                                        progress_bar: bool=False) -> MultiIndex:
 
         """
@@ -597,7 +597,7 @@ class PolygonAPIConnector(BaseAPIConnector):
 
     def get_internal_ticker_dividends(self, internal_tickers: MultiIndex, ticker_quotes: MultiIndex,
                                       no_cache: bool=False,
-                                      cache_expiry_delta: timedelta=timedelta(days=30),
+                                      cache_expiry_delta: timedelta=timedelta(days=7),
                                       progress_bar: bool=False) -> MultiIndex:
 
         """
