@@ -10,7 +10,7 @@ from src.api.secgov import SECGovAPIConnector
 from src.api.gleif import GLEIFAPIConnector
 
 
-# s3_connector = S3StorageConnector(credentials_file_path='config/aws.json')
+# s3_connector = S3StorageConnector(credentials_file_path='config/s3.json')
 # sec_connector = SECAPIConnector(credentials_file_path='config/sec.json')
 # polygon_connector = PolygonAPIConnector(credentials_file_path='config/polygon.json')
 

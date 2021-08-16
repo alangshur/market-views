@@ -4,7 +4,6 @@ from typing import Any
 from tqdm import tqdm
 import pandas as pd
 import requests
-import time
 
 from src.utils.functional.identifiers import check_ticker, to_string, parse_cik
 from src.utils.functional.prices import parse_price

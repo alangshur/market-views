@@ -26,14 +26,27 @@ class RedisStorageConnector(BaseStorageConnector):
         self.key_store = {}
 
     def get(self, key) -> Any:
-        return self.redis.get(key)
+        try:
+            obj = self.redis.get(key)
+            return obj
+        except Exception as e:
+            self.logger.exception('Exception in get: {}.'.format(e))
+            return None
 
     def set(self, key, value, timeout=None) -> bool:
-        result = bool(self.redis.set(key, value, timeout=timeout))
-        if result: self.key_store.add(key)
-        return result
+        try:
+            self.redis.set(key, value, timeout=timeout)
+            self.key_store.add(key)
+            return True
+        except Exception as e:
+            self.logger.exception('Exception in set: {}.'.format(e))
+            return False
 
     def delete(self, key) -> bool:
-        result = bool(self.redis.delete(key))
-        if result: self.key_store.discard(key)
-        return result
+        try:
+            self.redis.delete(key)
+            self.key_store.discard(key)
+            return True
+        except Exception as e:
+            self.logger.exception('Exception in delete: {}.'.format(e))
+            return False
