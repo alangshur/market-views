@@ -10,7 +10,7 @@ class DocumentDBStorageConnector(BaseStorageConnector):
         super().__init__(self.__class__.__name__, credentials_file_path)
 
         # get AWS credentials
-        self.mongodb_url = self.storage_credentials['local_mongodb_url']
+        self.mongodb_url = self.storage_credentials['mongodb_url']
         self.database_name = self.storage_credentials['database_name']
 
         # connect to s3
